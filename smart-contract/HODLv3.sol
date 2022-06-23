@@ -705,24 +705,7 @@ library Utils {
         uint256 bnbPool = currentBNBPool > rewardHardcap
             ? rewardHardcap
             : currentBNBPool;
-        /*
-        if (bnbPool > rewardHardcap) {
-            bnbPool = rewardHardcap;
-        }
-
-        // calculate reward to send
-        uint256 multiplier = 100;
-
-        // now calculate reward
-        
-        uint256 reward = bnbPool
-            .mul(100)
-            .mul(currentBalance)
-            .div(100)
-            .div(totalSupply);
-        */
-
-        return bnbPool.mul(100).mul(currentBalance).div(100).div(totalSupply);
+        return bnbPool.mul(currentBalance).div(totalSupply);
     }
 
     function calculateTopUpClaim(
@@ -845,6 +828,132 @@ library Utils {
             owner,
             block.timestamp + 360
         );
+    }
+
+    function calcStacked(
+        StackingStruct.stacking memory tmpstacking,
+        uint256 totalsupply,
+        uint256 currentRate,
+        uint256 stackingRate
+    ) public view returns (uint256) {
+        uint256 reward;
+        uint256 amount;
+
+        uint256 stackedTotal = 1E6 +
+            (block.timestamp - tmpstacking.tsStartStacking).mul(1E6) /
+            tmpstacking.cycle;
+        uint256 stacked = stackedTotal.div(1E6);
+        uint256 rest = stackedTotal - stacked.mul(1E6);
+
+        uint256 initialBalance = address(this).balance;
+
+        if (stackingRate > 0) {
+            amount = (tmpstacking.amount * stackingRate) / currentRate;
+        } else {
+            amount = tmpstacking.amount;
+        }
+
+        if (initialBalance >= tmpstacking.hardcap) {
+            reward =
+                (((uint256(tmpstacking.hardcap) * amount) / totalsupply) *
+                    stackedTotal) /
+                1E6;
+            if (reward >= initialBalance) reward = 0;
+
+            if (
+                reward == 0 || initialBalance.sub(reward) < tmpstacking.hardcap
+            ) {
+                reward =
+                    initialBalance -
+                    calcReward(
+                        initialBalance,
+                        totalsupply / amount,
+                        stacked,
+                        15
+                    );
+                reward +=
+                    (((initialBalance.sub(reward) * amount) / totalsupply) *
+                        rest) /
+                    1E6;
+            }
+        } else {
+            reward =
+                initialBalance -
+                calcReward(initialBalance, totalsupply / amount, stacked, 15);
+            reward +=
+                (((initialBalance.sub(reward) * amount) / totalsupply) * rest) /
+                1E6;
+        }
+
+        return
+            reward > tmpstacking.stackingLimit
+                ? uint256(tmpstacking.stackingLimit)
+                : reward;
+    }
+
+    // Computes `k * (1+1/q) ^ N`, with precision `p`. The higher
+    // the precision, the higher the gas cost. It should be
+    // something around the log of `n`. When `p == n`, the
+    // precision is absolute (sans possible integer overflows). <edit: NOT true, see comments>
+    // Much smaller values are sufficient to get a great approximation.
+    function calcReward(
+        uint256 k,
+        uint256 q,
+        uint256 n,
+        uint256 p
+    ) public pure returns (uint256) {
+        p = n < p ? n : p;
+        if (n > 100) {
+            p = 30;
+        }
+        if (n > 200) n = 200;
+
+        uint256 s = k;
+        uint256 x = (n * (n - 1)) / 2;
+        uint256 y = 1;
+        uint256 y2 = 1;
+        uint256 y3 = 1;
+        uint256 i;
+
+        for (i = 2; i <= p; i += 2) {
+            if (i > 20) {
+                y = q**10;
+                y2 = y;
+                y3 = q**(i - 20);
+            } else if (i > 10) {
+                y = q**10;
+                y2 = q**(i - 10);
+                y3 = 1;
+            } else {
+                y = q**i;
+                y2 = 1;
+                y3 = 1;
+            }
+            s += (k * x) / y / y2 / y3;
+            x = i == n ? 0 : (x * (n - i) * (n - i - 1)) / (i + 1) / (i + 2);
+        }
+
+        x = n;
+
+        for (i = 1; i <= p; i += 2) {
+            if (i > 20) {
+                y = q**10;
+                y2 = y;
+                y3 = q**(i - 20);
+            } else if (i > 10) {
+                y = q**10;
+                y2 = q**(i - 10);
+                y3 = 1;
+            } else {
+                y = q**i;
+                y2 = 1;
+                y3 = 1;
+            }
+            s -= (k * x) / y / y2 / y3;
+            x = i == n ? 0 : (x * (n - i) * (n - i - 1)) / (i + 1) / (i + 2);
+        }
+
+        return s;
     }
 }
 
@@ -1030,7 +1139,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         override
         returns (bool)
     {
-        _transfer(_msgSender(), recipient, amount, 0);
+        _transfer(_msgSender(), recipient, amount);
         return true;
     }
 
@@ -1057,7 +1166,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         address recipient,
         uint256 amount
     ) public override returns (bool) {
-        _transfer(sender, recipient, amount, 0);
+        _transfer(sender, recipient, amount);
         _approve(
             sender,
             _msgSender(),
@@ -1329,11 +1438,11 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         return _amount.mul(_liquidityFee).div(10**3);
     }
 
+    /*
     function checkTaxAndLiquidityFees() private view returns (bool) {
-        return
-            block.timestamp >
-            disruptiveTransferEnabledFrom.add(daySeconds.mul(2));
+         return block.timestamp > disruptiveTransferEnabledFrom.add(daySeconds.mul(2));
     }
+    */
 
     function removeAllFee() private {
         if (_taxFee == 0 && _liquidityFee == 0) return;
@@ -1369,11 +1478,10 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function _transfer(
         address from,
         address to,
-        uint256 amount,
-        uint256 value
+        uint256 amount
     ) private {
-        require(!isBlacklisted[from], "Sender is backlisted");
-        require(!isBlacklisted[to], "Recipient is backlisted");
+        //require(!isBlacklisted[from], "Sender is backlisted");
+        //require(!isBlacklisted[to], "Recipient is backlisted");
         require(from != address(0), "BEP20: transfer from the zero address");
         require(to != address(0), "BEP20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
@@ -1392,7 +1500,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
         // take sell fee
         if (pairAddresses[to] && from != address(this) && from != owner()) {
-            ensureMaxTxAmount(from, to, amount, value);
+            ensureMaxTxAmount(from, to, amount);
             _taxFee = selltax.mul(_Reflection).div(100);
             _liquidityFee = selltax.mul(_Tokenomics).div(100);
             if (!_inSwapAndLiquify) {
@@ -1401,13 +1509,18 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         }
         // take buy fee
         else if (pairAddresses[from] && to != address(this) && to != owner()) {
+            /*
             if (!checkTaxAndLiquidityFees()) {
                 _taxFee = buytax.mul(_Reflection).div(100).div(2);
                 _liquidityFee = buytax.mul(_Tokenomics).div(100).div(2);
             } else {
-                _taxFee = buytax.mul(_Reflection).div(100);
-                _liquidityFee = buytax.mul(_Tokenomics).div(100);
+                */
+            if (balanceOf(to) == 0) {
+                firstBuyTimeStamp[to] = block.timestamp;
             }
+            _taxFee = buytax.mul(_Reflection).div(100);
+            _liquidityFee = buytax.mul(_Tokenomics).div(100);
+            //}
         }
         // take transfer fee
         else {
@@ -1430,11 +1543,11 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     ) private {
         if (!takeFee) removeAllFee();
 
-        // top up claim cycle for recipient
-        topUpClaimCycleAfterTransfer(recipient, amount);
+        // top up claim cycle for recipient and sender
+        topUpClaimCycleAfterTransfer(sender, recipient, amount);
 
         // top up claim cycle for sender
-        topUpClaimCycleAfterTransfer(sender, amount);
+        //topUpClaimCycleAfterTransfer(sender, amount);
 
         if (_isExcluded[sender] && !_isExcluded[recipient]) {
             _transferFromExcluded(sender, recipient, amount);
@@ -1515,21 +1628,22 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     // Innovation for protocol by HODL Team
     uint256 public rewardCycleBlock;
-    uint256 public easyRewardCycleBlock;
+    uint256 private reserve_2;
     uint256 public threshHoldTopUpRate;
     uint256 public _maxTxAmount;
-    uint256 public disruptiveCoverageFee;
+    uint256 public bnbStackingLimit;
     mapping(address => uint256) public nextAvailableClaimDate;
     bool public swapAndLiquifyEnabled;
-    uint256 public disruptiveTransferEnabledFrom;
-    uint256 public disableEasyRewardFrom;
+    uint256 private reserve_5;
+    uint256 private reserve_6;
 
     bool public reflectionFeesDisabled;
 
     uint256 private _taxFee;
     uint256 private _previousTaxFee;
 
-    LayerTax public reinvestTax;
+    uint256[6] private antiFlipTax;
+
     LayerTax public bnbClaimTax;
 
     struct LayerTax {
@@ -1545,14 +1659,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     uint256 public buytax;
     uint256 public transfertax;
 
-    uint256 private marketingshare; //unused
-    uint256 private buybackshare; //unused
-    uint256 private teamshare; //unused
+    uint256 public claimBNBLimit;
+    uint256 public reinvestLimit;
+    uint256 private reserve_1;
 
     address public reservewallet;
     address public teamwallet;
     address public marketingwallet;
-    address public reinvestwallet;
+    address public stackingWallet;
 
     uint256 private _liquidityFee;
     uint256 private _previousLiquidityFee;
@@ -1579,7 +1693,17 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     mapping(address => bool) public pairAddresses;
 
+    address public HodlMasterChef;
+
+    mapping(address => uint256) private firstBuyTimeStamp;
+
+    mapping(address => StackingStruct.stacking) public rewardStacking;
+    bool public stackingEnabled;
+
+    mapping(address => uint256) private stackingRate;
+
     function setMaxTxPercent(uint256 maxTxPercent) public onlyOwner {
+        require(maxTxPercent <= 100, "Error");
         _maxTxAmount = _tTotal.mul(maxTxPercent).div(100000);
     }
 
@@ -1610,10 +1734,12 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             );
     }
 
+    /*
     function getRewardCycleBlock() public view returns (uint256) {
         if (block.timestamp >= disableEasyRewardFrom) return rewardCycleBlock;
         return easyRewardCycleBlock;
     }
+    */
 
     function redeemRewards(uint256 perc) public isHuman nonReentrant {
         require(
@@ -1625,14 +1751,25 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             "Error: must own HODL to claim reward"
         );
 
-        uint256 reward = calculateBNBReward(msg.sender);
+        uint256 totalsupply = uint256(_tTotal)
+        .sub(balanceOf(address(0)))
+        .sub(balanceOf(0x000000000000000000000000000000000000dEaD)).sub( // exclude burned wallet
+                balanceOf(address(pancakePair))
+            ); // exclude liquidity wallet
+        uint256 currentBNBPool = address(this).balance;
+
+        uint256 reward = currentBNBPool > rewardHardcap
+            ? rewardHardcap.mul(balanceOf(msg.sender)).div(totalsupply)
+            : currentBNBPool.mul(balanceOf(msg.sender)).div(totalsupply);
+
         uint256 rewardreinvest;
         uint256 rewardBNB;
 
-        if (perc == 0) {
-            rewardreinvest = reward;
-        } else if (perc == 100) {
+        if (perc == 100) {
+            require(reward > claimBNBLimit, "Reward below gas fee");
             rewardBNB = reward;
+        } else if (perc == 0) {
+            rewardreinvest = reward;
         } else {
             rewardBNB = reward.mul(perc).div(100);
             rewardreinvest = reward.sub(rewardBNB);
@@ -1640,6 +1777,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
         // BNB REINVEST
         if (perc < 100) {
+            require(reward > reinvestLimit, "Reward below gas fee");
+
             // Re-InvestTokens
             uint256 expectedtoken = Utils.getAmountsout(
                 rewardreinvest,
@@ -1650,22 +1789,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             userreinvested[msg.sender] += expectedtoken;
             totalreinvested += expectedtoken;
 
-            // buy tokens
-            if (_isExcludedFromFee[msg.sender]) {
-                Utils.swapETHForTokens(
-                    address(pancakeRouter),
-                    msg.sender,
-                    rewardreinvest
-                );
-            } else {
-                _isExcludedFromFee[msg.sender] = true;
-                Utils.swapETHForTokens(
-                    address(pancakeRouter),
-                    msg.sender,
-                    rewardreinvest
-                );
-                _isExcludedFromFee[msg.sender] = false;
-            }
+            _tokenTransfer(address(this), msg.sender, expectedtoken, false);
         }
 
         // BNB CLAIM
@@ -1700,9 +1824,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         }
 
         // update rewardCycleBlock
-        nextAvailableClaimDate[msg.sender] =
-            block.timestamp +
-            getRewardCycleBlock();
+        nextAvailableClaimDate[msg.sender] = block.timestamp + rewardCycleBlock;
         emit ClaimBNBSuccessfully(
             msg.sender,
             reward,
@@ -1710,76 +1832,105 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         );
     }
 
-    function topUpClaimCycleAfterTransfer(address _add, uint256 amount)
-        private
-    {
-        uint256 currentRecipientBalance = balanceOf(_add);
-        uint256 basedRewardCycleBlock = getRewardCycleBlock();
-
+    function topUpClaimCycleAfterTransfer(
+        address _sender,
+        address _recipient,
+        uint256 amount
+    ) private {
+        //_recipient
+        uint256 currentBalance = balanceOf(_recipient);
         if (
-            (_add == owner() && nextAvailableClaimDate[_add] == 0) ||
-            currentRecipientBalance == 0
+            (_recipient == owner() &&
+                nextAvailableClaimDate[_recipient] == 0) || currentBalance == 0
         ) {
-            nextAvailableClaimDate[_add] =
+            nextAvailableClaimDate[_recipient] =
                 block.timestamp +
-                basedRewardCycleBlock;
+                rewardCycleBlock;
         } else {
-            nextAvailableClaimDate[_add] =
-                nextAvailableClaimDate[_add] +
-                Utils.calculateTopUpClaim(
-                    currentRecipientBalance,
-                    basedRewardCycleBlock,
+            nextAvailableClaimDate[_recipient] += Utils.calculateTopUpClaim(
+                currentBalance,
+                rewardCycleBlock,
+                threshHoldTopUpRate,
+                amount
+            );
+            if (
+                nextAvailableClaimDate[_recipient] >
+                block.timestamp + rewardCycleBlock
+            ) {
+                nextAvailableClaimDate[_recipient] =
+                    block.timestamp +
+                    rewardCycleBlock;
+            }
+        }
+
+        //sender
+        if (_recipient != HodlMasterChef) {
+            currentBalance = balanceOf(_sender);
+            if (
+                (_sender == owner() && nextAvailableClaimDate[_sender] == 0) ||
+                currentBalance == 0
+            ) {
+                nextAvailableClaimDate[_sender] =
+                    block.timestamp +
+                    rewardCycleBlock;
+            } else {
+                nextAvailableClaimDate[_sender] += Utils.calculateTopUpClaim(
+                    currentBalance,
+                    rewardCycleBlock,
                     threshHoldTopUpRate,
                     amount
                 );
+                if (
+                    nextAvailableClaimDate[_sender] >
+                    block.timestamp + rewardCycleBlock
+                ) {
+                    nextAvailableClaimDate[_sender] =
+                        block.timestamp +
+                        rewardCycleBlock;
+                }
+            }
         }
     }
 
     function ensureMaxTxAmount(
         address from,
         address to,
-        uint256 amount,
-        uint256 value
+        uint256 amount
     ) private {
         if (
             _isExcludedFromMaxTx[from] == false && // default will be false
             _isExcludedFromMaxTx[to] == false // default will be false
         ) {
-            if (
-                value < disruptiveCoverageFee &&
-                block.timestamp >= disruptiveTransferEnabledFrom
-            ) {
-                WalletAllowance storage wallet = userWalletAllowance[from];
+            //if (value < disruptiveCoverageFee && block.timestamp >= disruptiveTransferEnabledFrom) {
+            WalletAllowance storage wallet = userWalletAllowance[from];
 
-                if (block.timestamp > wallet.timestamp.add(daySeconds)) {
-                    wallet.timestamp = 0;
-                    wallet.amount = 0;
-                }
-
-                uint256 totalAmount = wallet.amount.add(amount);
-
-                require(
-                    totalAmount <= _maxTxAmount,
-                    "Amount is more than the maximum limit"
-                );
-
-                if (wallet.timestamp == 0) {
-                    wallet.timestamp = block.timestamp;
-                }
-
-                wallet.amount = totalAmount;
+            if (block.timestamp > wallet.timestamp.add(daySeconds)) {
+                wallet.timestamp = 0;
+                wallet.amount = 0;
             }
+
+            uint256 totalAmount = wallet.amount.add(amount);
+
+            require(
+                totalAmount <= _maxTxAmount,
+                "Amount is more than the maximum limit"
+            );
+
+            if (wallet.timestamp == 0) {
+                wallet.timestamp = block.timestamp;
+            }
+
+            wallet.amount = totalAmount;
+            //}
         }
     }
 
-    function disruptiveTransfer(address recipient, uint256 amount)
-        public
-        payable
-        returns (bool)
-    {
+    /*
+    function disruptiveTransfer(address recipient, uint256 amount) public payable returns (bool){
         _transfer(_msgSender(), recipient, amount, msg.value);
         return true;
     }
+    */
 
     function swapAndLiquify(address from, address to) private lockTheSwap {
         uint256 contractTokenBalance = balanceOf(address(this));
@@ -1906,13 +2057,6 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         marketingwallet = _newaddress;
     }
 
-    function changereinvestwallet(address payable _newaddress)
-        public
-        onlyOwner
-    {
-        reinvestwallet = _newaddress;
-    }
-
     function changetriggerwallet(address payable _newaddress) public onlyOwner {
         triggerwallet = _newaddress;
     }
@@ -1952,6 +2096,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     }
 
     function changeSelltax(uint256 _selltax) public onlyOwner {
+        require(_selltax <= 100, "Error");
         selltax = _selltax;
     }
 
@@ -2002,23 +2147,11 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         );
     }
 
-    function changereinvesttax(
-        uint256 _layer1,
-        uint256 _layer2,
-        uint256 _layer3,
-        uint256 _layer4,
-        uint256 _layer5,
-        uint256 _layer6
-    ) public onlyOwner {
-        reinvestTax = LayerTax(
-            _layer1,
-            _layer2,
-            _layer3,
-            _layer4,
-            _layer5,
-            _layer6
-        );
+    /*
+    function changereinvesttax(uint256 _layer1, uint256 _layer2, uint256 _layer3, uint256 _layer4, uint256 _layer5, uint256 _layer6) public onlyOwner {
+        reinvestTax = LayerTax(_layer1, _layer2, _layer3, _layer4, _layer5, _layer6);
     }
+    */
 
     function changeminTokenNumberToSell(uint256 _newvalue) public onlyOwner {
         require(_newvalue <= minTokenNumberUpperlimit, "Incorrect Value");
@@ -2058,16 +2191,179 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     }
 
     function initializeUpgradedContract() public onlyOwner {
-        bnbClaimTax = LayerTax(0, 0, 0, 0, 0, 0);
-        reinvestTax = LayerTax(0, 0, 0, 0, 0, 0);
-        tokenomics = Tokenomics(60, 20, 10, 10, 0);
-        selltax = 100;
-        buytax = 50;
-        transfertax = 100;
-        updateTokenomics();
-        //init pairAddresses
-        pairAddresses[pancakePair] = true;
-        pairAddresses[0xa3cF95FdA825399Bb71C6C26969266fcEB79e48B] = true; //BabySwap
-        pairAddresses[0x0bd7F4AEBed7b748E4743A8C544B7C5450dD7EBa] = true; //HODL X
+        stackingWallet = 0xCF99b7c6189Caf2CBdcAC07280e0490827418221;
+    }
+
+    function changeclaimBNBLimit(uint256 _newvalue) public onlyOwner {
+        claimBNBLimit = _newvalue;
+    }
+
+    function changereinvestLimit(uint256 _newvalue) public onlyOwner {
+        reinvestLimit = _newvalue;
+    }
+
+    function changeHODLMasterChef(address _newaddress) public onlyOwner {
+        HodlMasterChef = _newaddress;
+    }
+
+    function changeStackingWallet(address payable _newaddress)
+        public
+        onlyOwner
+    {
+        stackingWallet = _newaddress;
+    }
+
+    /*
+    function getStackingCounter(uint64 cycle) public view returns (uint64) {
+        return uint64((block.timestamp-stackingCounterStart) / cycle);
+    }
+    */
+    function enableStacking(bool _value) public onlyOwner {
+        stackingEnabled = _value;
+    }
+
+    function changeBNBstackingLimit(uint256 _newvalue) public onlyOwner {
+        bnbStackingLimit = _newvalue;
+    }
+
+    function startStacking() public {
+        uint96 balance = uint96(balanceOf(msg.sender) - 1E9);
+
+        require(
+            stackingEnabled && !rewardStacking[msg.sender].enabled,
+            "Not available"
+        );
+        require(
+            nextAvailableClaimDate[msg.sender] <= block.timestamp,
+            "Error: next available not reached"
+        );
+        require(balance > 15000000000000000, "Error: Wrong amount");
+
+        rewardStacking[msg.sender] = StackingStruct.stacking(
+            true,
+            uint64(rewardCycleBlock),
+            uint64(block.timestamp),
+            uint96(bnbStackingLimit),
+            uint96(balance),
+            uint96(rewardHardcap)
+        );
+        stackingRate[msg.sender] = _getRate();
+        _tokenTransfer(msg.sender, stackingWallet, balance, false);
+    }
+
+    function getStacked(address _address) public view returns (uint256) {
+        StackingStruct.stacking memory tmpStack = rewardStacking[_address];
+        if (tmpStack.enabled) {
+            uint256 totalsupply = uint256(_tTotal)
+            .sub(balanceOf(address(0)))
+            .sub(balanceOf(0x000000000000000000000000000000000000dEaD)).sub( // exclude burned wallet
+                    balanceOf(address(pancakePair))
+                ); // exclude liquidity wallet
+
+            return
+                Utils.calcStacked(
+                    tmpStack,
+                    totalsupply,
+                    _getRate(),
+                    stackingRate[msg.sender]
+                );
+        }
+        return 0;
+    }
+
+    function stopStackingAndClaim(uint256 perc) public nonReentrant {
+        StackingStruct.stacking memory tmpstacking = rewardStacking[msg.sender];
+
+        require(tmpstacking.enabled, "Stacking not enabled");
+        uint256 amount;
+        uint256 rewardBNB;
+        uint256 rewardreinvest;
+        uint256 reward = getStacked(msg.sender);
+
+        if (perc == 100) {
+            rewardBNB = reward;
+        } else if (perc == 0) {
+            rewardreinvest = reward;
+        } else {
+            rewardBNB = reward.mul(perc).div(100);
+            rewardreinvest = reward.sub(rewardBNB);
+        }
+
+        // BNB REINVEST
+        if (perc < 100) {
+            // Re-InvestTokens
+            uint256 expectedtoken = Utils.getAmountsout(
+                rewardreinvest,
+                address(pancakeRouter)
+            );
+
+            // update reinvest rewards
+            userreinvested[msg.sender] += expectedtoken;
+            totalreinvested += expectedtoken;
+            _tokenTransfer(address(this), msg.sender, expectedtoken, false);
+        }
+
+        // BNB CLAIM
+        if (rewardBNB > 0) {
+            uint256 rewardfee;
+            bool success;
+            // deduct tax
+            if (rewardBNB < 0.1 ether) {
+                rewardfee = rewardBNB.mul(bnbClaimTax.layer1).div(100);
+            } else if (rewardBNB < 0.25 ether) {
+                rewardfee = rewardBNB.mul(bnbClaimTax.layer2).div(100);
+            } else if (rewardBNB < 0.5 ether) {
+                rewardfee = rewardBNB.mul(bnbClaimTax.layer3).div(100);
+            } else if (rewardBNB < 0.75 ether) {
+                rewardfee = rewardBNB.mul(bnbClaimTax.layer4).div(100);
+            } else if (rewardBNB < 1 ether) {
+                rewardfee = rewardBNB.mul(bnbClaimTax.layer5).div(100);
+            } else {
+                rewardfee = rewardBNB.mul(bnbClaimTax.layer6).div(100);
+            }
+            rewardBNB -= rewardfee;
+            (success, ) = address(reservewallet).call{value: rewardfee}("");
+            require(success, " Error: Cannot send reward");
+
+            // send bnb to user
+            (success, ) = address(msg.sender).call{value: rewardBNB}("");
+            require(success, "Error: Cannot withdraw reward");
+
+            // update claimed rewards
+            userClaimedBNB[msg.sender] += rewardBNB;
+            totalClaimedBNB += rewardBNB;
+        }
+
+        uint256 rate = stackingRate[msg.sender];
+
+        if (rate > 0) {
+            amount = (tmpstacking.amount * rate) / _getRate();
+        } else {
+            amount = tmpstacking.amount;
+        }
+
+        _tokenTransfer(stackingWallet, msg.sender, amount, false);
+
+        StackingStruct.stacking memory tmpStack;
+        rewardStacking[msg.sender] = tmpStack;
+
+        // update rewardCycleBlock
+        nextAvailableClaimDate[msg.sender] = block.timestamp + rewardCycleBlock;
+        emit ClaimBNBSuccessfully(
+            msg.sender,
+            reward,
+            nextAvailableClaimDate[msg.sender]
+        );
+    }
+}
+
+library StackingStruct {
+    struct stacking {
+        bool enabled;
+        uint64 cycle;
+        uint64 tsStartStacking;
+        uint96 stackingLimit;
+        uint96 amount;
+        uint96 hardcap;
     }
 }
