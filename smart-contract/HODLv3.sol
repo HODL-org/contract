@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: Unlicensed
-
+//
+//   __    __     ______     _____       __
+//  |  |  |  |   /  __  \   |      \    |  |
+//  |  |__|  |  |  |  |  |  |   _   \   |  |
+//  |   __   |  |  |  |  |  |  |_)   |  |  |
+//  |  |  |  |  |  `--'  |  |       /   |  |____
+//  |__|  |__|   \______/   |_____ /    |_______|
+//
+//
 pragma solidity ^0.8.0;
 
 /**
@@ -2118,10 +2126,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     */
     function redeemRewards(uint256 perc) external isHuman nonReentrant {
         require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: next available not reached");
-        require(balanceOf(msg.sender) >= 0, "Error: must own HODL to claim reward");
+        require(balanceOf(msg.sender) > 0, "Error: must own HODL to claim reward");
 
         uint256 totalsupply = uint256(_tTotal)
-            .sub(balanceOf(address(0)))
             .sub(balanceOf(0x000000000000000000000000000000000000dEaD)) // exclude burned wallet
             .sub(balanceOf(address(pancakePair))); // exclude liquidity wallet
         uint256 currentBNBPool = address(this).balance;
@@ -2153,7 +2160,19 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             userreinvested[msg.sender] += expectedtoken;
             totalreinvested += expectedtoken;
 
-            _tokenTransfer(address(this), msg.sender, expectedtoken, false);
+            uint256 rAmount = expectedtoken * _getRate();
+        
+            if (_isExcluded[msg.sender]) { 
+                _rOwned[msg.sender] = _rOwned[msg.sender].add(rAmount);
+                _tOwned[msg.sender] = _tOwned[msg.sender].add(expectedtoken);
+                _rOwned[address(this)] = _rOwned[address(this)].add(rAmount);
+            } else {
+                _rOwned[msg.sender] = _rOwned[msg.sender].add(rAmount);
+                _rOwned[address(this)] = _rOwned[address(this)].sub(rAmount);
+            }
+            emit Transfer(stackingWallet, msg.sender, expectedtoken);
+            //_tokenTransfer(address(this), msg.sender, expectedtoken, false);
+
         }
 
         // BNB CLAIM
@@ -2489,10 +2508,29 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: next available not reached");
         require(balance > 15000000000000000, "Error: Wrong amount");
 
-        rewardStacking[msg.sender] = StackingStruct.stacking(true, uint64(rewardCycleBlock), uint64(block.timestamp), uint96(bnbStackingLimit), uint96(balance), uint96(rewardHardcap));
-        stackingRate[msg.sender] = _getRate();
-        _tokenTransfer(msg.sender, stackingWallet, balance, false);
+        rewardStacking[msg.sender] = StackingStruct.stacking(
+            true, 
+            uint64(rewardCycleBlock), 
+            uint64(block.timestamp), 
+            uint96(bnbStackingLimit), 
+            uint96(balance), 
+            uint96(rewardHardcap));
 
+        uint256 currentRate = _getRate();
+        stackingRate[msg.sender] = currentRate;
+
+        uint256 rBalance = balance * currentRate;
+
+        if (_isExcluded[msg.sender]) { 
+            _tOwned[msg.sender] = _tOwned[msg.sender].sub(balance);
+            _rOwned[msg.sender] = _rOwned[msg.sender].sub(rBalance);
+            _rOwned[stackingWallet] = _rOwned[stackingWallet].add(rBalance);
+        } else {
+            _rOwned[msg.sender] = _rOwned[msg.sender].sub(rBalance);
+            _rOwned[stackingWallet] = _rOwned[stackingWallet].add(rBalance);
+        }
+        //_tokenTransfer(msg.sender, stackingWallet, balance, false);
+        emit Transfer(msg.sender, stackingWallet, balance);
         emit StartStacking(msg.sender, balance);
     }
     
@@ -2500,7 +2538,6 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         StackingStruct.stacking memory tmpStack =  rewardStacking[_address];
         if (tmpStack.enabled) {
             uint256 totalsupply = uint256(_tTotal)
-                .sub(balanceOf(address(0)))
                 .sub(balanceOf(0x000000000000000000000000000000000000dEaD)) // exclude burned wallet
                 .sub(balanceOf(address(pancakePair))); // exclude liquidity wallet
         
@@ -2580,15 +2617,27 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         }
 
         uint256 rate = stackingRate[msg.sender];
+        uint256 currentRate =  _getRate();
 
         if (rate > 0)
         {
-            amount = tmpstacking.amount * rate / _getRate();
+            amount = tmpstacking.amount * rate /currentRate;
         } else {
             amount = tmpstacking.amount;
         }
 
-        _tokenTransfer(stackingWallet, msg.sender, amount, false);
+        uint256 rAmount = amount *  currentRate;
+        
+        if (_isExcluded[msg.sender]) { 
+            _rOwned[msg.sender] = _rOwned[msg.sender].add(rAmount);
+            _tOwned[msg.sender] = _tOwned[msg.sender].add(amount);
+            _rOwned[stackingWallet] = _rOwned[stackingWallet].add(rAmount);
+        } else {
+            _rOwned[msg.sender] = _rOwned[msg.sender].add(rAmount);
+            _rOwned[stackingWallet] = _rOwned[stackingWallet].sub(rAmount);
+        }
+        emit Transfer(stackingWallet, msg.sender, amount);
+        //_tokenTransfer(stackingWallet, msg.sender, amount, false);
 
         StackingStruct.stacking memory tmpStack;
         rewardStacking[msg.sender] = tmpStack;
@@ -2596,6 +2645,16 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         // update rewardCycleBlock
         nextAvailableClaimDate[msg.sender] = block.timestamp + rewardCycleBlock;
         emit ClaimBNBSuccessfully(msg.sender,reward,nextAvailableClaimDate[msg.sender]);
+    }
+
+    function withdrawBEB20(address _token, uint256 amount) external onlyOwner {
+        uint256 tokenBalance = IBEP20(_token).balanceOf(address(this));
+        if (amount == 0) {
+            amount = tokenBalance;
+        } else {
+            require(amount <= tokenBalance, "Wrong amount");
+        }
+        IBEP20(_token).transfer(msg.sender, amount);
     }
 
 }
