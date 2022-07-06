@@ -2160,7 +2160,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                 _rOwned[msg.sender] += rAmount;
                 _rOwned[address(this)] -= rAmount;
             }
-            emit Transfer(stackingWallet, msg.sender, expectedtoken);
+            emit Transfer(address(this), msg.sender, expectedtoken);
 
         }
 
@@ -2572,7 +2572,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                 _rOwned[msg.sender] += rExpected;
                 _rOwned[address(this)] -= rExpected;
             }
-            emit Transfer(stackingWallet, msg.sender, expectedtoken);
+            emit Transfer(address(this), msg.sender, expectedtoken);
 
         }
 
