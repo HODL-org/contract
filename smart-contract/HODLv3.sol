@@ -1573,7 +1573,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             _msgSender(),
             _allowances[sender][_msgSender()].sub(
                 amount,
-                "BEP20: transfer amount exceeds allowance"
+                "transfer exceeds allowance"
             )
         );
         return true;
@@ -1602,7 +1602,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             spender,
             _allowances[_msgSender()][spender].sub(
                 subtractedValue,
-                "BEP20: decreased allowance below zero"
+                "decreased below zero"
             )
         );
         return true;
@@ -1618,10 +1618,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     function deliver(uint256 tAmount) public {
         address sender = _msgSender();
-        require(
-            !_isExcluded[sender],
-            "Excluded addresses cannot call this function"
-        );
+        require(!_isExcluded[sender], "Err: excluded");
         (uint256 rAmount, , , , , ) = _getValues(tAmount);
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
         _rTotal = _rTotal.sub(rAmount);
@@ -1633,7 +1630,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         view
         returns (uint256)
     {
-        require(tAmount <= _tTotal, "Amount must be less than supply");
+        require(tAmount <= _tTotal, "Wrong amount");
         if (!deductTransferFee) {
             (uint256 rAmount, , , , , ) = _getValues(tAmount);
             return rAmount;
@@ -1648,17 +1645,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         view
         returns (uint256)
     {
-        require(
-            rAmount <= _rTotal,
-            "Amount must be less than total reflections"
-        );
+        require(rAmount <= _rTotal,"Wrong amount");
         uint256 currentRate = _getRate();
         return rAmount.div(currentRate);
     }
 
     function excludeFromReward(address account) external onlyOwner {
         // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Pancake router.');
-        require(!_isExcluded[account], "Account is already excluded");
+        require(!_isExcluded[account], "Account already excluded");
         if (_rOwned[account] > 0) {
             _tOwned[account] = tokenFromReflection(_rOwned[account]);
         }
@@ -1667,7 +1661,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     }
 
     function includeInReward(address account) external onlyOwner {
-        require(_isExcluded[account], "Account is already excluded");
+        require(_isExcluded[account], "Account already excluded");
         for (uint256 i = 0; i < _excluded.length; i++) {
             if (_excluded[i] == account) {
                 _excluded[i] = _excluded[_excluded.length - 1];
@@ -1851,9 +1845,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         address spender,
         uint256 amount
     ) private {
-        require(owner != address(0), "BEP20: approve from the zero address");
-        require(spender != address(0), "BEP20: approve to the zero address");
-
+        require(owner != address(0) && spender != address(0), "Error: zero address");
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
@@ -1863,9 +1855,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         address to,
         uint256 amount
     ) private {
-        require(from != address(0), "BEP20: transfer from the zero address");
-        require(to != address(0), "BEP20: transfer to the zero address");
-        require(amount > 0, "Transfer amount must be greater than zero");
+        require(from != address(0) && to != address(0), "Error zero address");
+        require(amount > 0, "Amount is zero");
 
         //indicates if fee should be deducted from transfer
         bool takeFee = true;
@@ -1890,7 +1881,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             */
             ensureMaxTxAmount(from, to, amount);          
             _taxFee = selltax.mul(_Reflection).div(100); 
-            _liquidityFee = selltax.mul(_Tokenomics).div(100);
+            _liquidityFee = selltax.mul(_Taxes).div(100);
             if (!_inSwapAndLiquify) {
                 swapAndLiquify(from, to);
             }
@@ -1901,14 +1892,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             pairAddresses[from] && to != address(this) && to != owner()
         ) {
             _taxFee = buytax.mul(_Reflection).div(100);
-            _liquidityFee = buytax.mul(_Tokenomics).div(100);
+            _liquidityFee = buytax.mul(_Taxes).div(100);
         }
         
         // take transfer fee
         else {
             if (takeFee && from != owner() && from != address(this)) {
                 _taxFee = transfertax.mul(_Reflection).div(100);
-                _liquidityFee = transfertax.mul(_Tokenomics).div(100);
+                _liquidityFee = transfertax.mul(_Taxes).div(100);
             }
         }
 
@@ -2058,9 +2049,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     uint256 public rewardHardcap;
 
-    Tokenomics public tokenomics;
+    Taxes public taxes;
     
-    struct Tokenomics {
+    struct Taxes {
         uint256 bnbReward;
         uint256 liquidity;
         uint256 marketing;
@@ -2069,7 +2060,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     }
 
     uint256 private _Reflection;
-    uint256 private _Tokenomics;
+    uint256 private _Taxes;
 
     address public triggerwallet;
 
@@ -2106,7 +2097,6 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     */
     function calculateBNBReward(address ofAddress) external view returns (uint256){
         uint256 totalsupply = uint256(_tTotal)
-            .sub(balanceOf(address(0)))
             .sub(balanceOf(0x000000000000000000000000000000000000dEaD)) // exclude burned wallet
             .sub(balanceOf(address(pancakePair))); // exclude liquidity wallet
         
@@ -2125,8 +2115,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     *   "Keep building. That's how you prove them wrong." - David Gokhstein     
     */
     function redeemRewards(uint256 perc) external isHuman nonReentrant {
-        require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: next available not reached");
-        require(balanceOf(msg.sender) > 0, "Error: must own HODL to claim reward");
+        require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: too early");
+        require(balanceOf(msg.sender) > 0, "Error: no Hodl");
 
         uint256 totalsupply = uint256(_tTotal)
             .sub(balanceOf(0x000000000000000000000000000000000000dEaD)) // exclude burned wallet
@@ -2163,15 +2153,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             uint256 rAmount = expectedtoken * _getRate();
         
             if (_isExcluded[msg.sender]) { 
-                _rOwned[msg.sender] = _rOwned[msg.sender].add(rAmount);
-                _tOwned[msg.sender] = _tOwned[msg.sender].add(expectedtoken);
-                _rOwned[address(this)] = _rOwned[address(this)].add(rAmount);
+                _rOwned[msg.sender] += rAmount;
+                _tOwned[msg.sender] += expectedtoken;
+                _rOwned[address(this)] -= rAmount;
             } else {
-                _rOwned[msg.sender] = _rOwned[msg.sender].add(rAmount);
-                _rOwned[address(this)] = _rOwned[address(this)].sub(rAmount);
+                _rOwned[msg.sender] += rAmount;
+                _rOwned[address(this)] -= rAmount;
             }
             emit Transfer(stackingWallet, msg.sender, expectedtoken);
-            //_tokenTransfer(address(this), msg.sender, expectedtoken, false);
 
         }
 
@@ -2181,25 +2170,27 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             bool success;
             // deduct tax
             if (rewardBNB < 0.1 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer1).div(100);
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer1).div(100);
             } else if (rewardBNB < 0.25 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer2).div(100);
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer2).div(100);
             } else if (rewardBNB < 0.5 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer3).div(100);
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer3).div(100);
             } else if (rewardBNB < 0.75 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer4).div(100);
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer4).div(100);
             } else if (rewardBNB < 1 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer5).div(100);
-            } else {
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer5).div(100);
+            } else if (bnbClaimTax.layer6 > 0) {
                 rewardfee = rewardBNB.mul(bnbClaimTax.layer6).div(100);
             }
-            rewardBNB -= rewardfee;
-            (success, ) = address(reservewallet).call{value: rewardfee}("");
-            require(success, " Error: Cannot send reward");
+            if (rewardfee > 0) {
+                rewardBNB -= rewardfee;
+                (success, ) = address(reservewallet).call{value: rewardfee}("");
+                require(success, "Err: sending fee");
+            }
 
             // send bnb to user
             (success, ) = address(msg.sender).call{value: rewardBNB}("");
-            require(success, "Error: Cannot withdraw reward");
+            require(success, "Err: sending reward");
 
             // update claimed rewards
             userClaimedBNB[msg.sender] += rewardBNB;
@@ -2261,7 +2252,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
                 require(
                     totalAmount <= _maxTxAmount,
-                    "Amount is more than the maximum limit"
+                    "Amount greater limit"
                 );
 
                 if (wallet.timestamp == 0) {
@@ -2273,7 +2264,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     }
 
     /* @dev Function that swaps tokens from the contract for bnb
-    *   Bnb is split up due to tokenomics and send to the specified wallets
+    *   Bnb is split up due to taxes and send to the specified wallets
     *
     *       "They talk, we build" - Josh from StaySAFU
     */
@@ -2291,26 +2282,26 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                 Utils.swapTokensForEth(address(pancakeRouter), minTokenNumberToSell);       
                 uint256 deltaBalance = address(this).balance.sub(initialBalance);
 
-                if (tokenomics.marketing > 0) {
+                if (taxes.marketing > 0) {
                     // send marketing rewards
-                    (bool sent, ) = payable(address(marketingwallet)).call{value: deltaBalance.mul(tokenomics.marketing).div(_Tokenomics)}("");
-                    require(sent, "Error: Cannot send reward");
+                    (bool sent, ) = payable(address(marketingwallet)).call{value: deltaBalance.mul(taxes.marketing).div(_Taxes)}("");
+                    require(sent, "Err: sending fee");
                 }
 
-                if (tokenomics.reserve > 0) {
+                if (taxes.reserve > 0) {
                     // send resere rewards
-                    (bool succ, ) = payable(address(reservewallet)).call{value: deltaBalance.mul(tokenomics.reserve).div(_Tokenomics)}("");
-                    require(succ, "Error: Cannot send reward");
+                    (bool succ, ) = payable(address(reservewallet)).call{value: deltaBalance.mul(taxes.reserve).div(_Taxes)}("");
+                    require(succ, "Err: sending fee");
                 }   
 
-                if (tokenomics.liquidity > 0) {
+                if (taxes.liquidity > 0) {
                     // add liquidity to pancake
-                    uint256 liquidityToken = minTokenNumberToSell.mul(tokenomics.liquidity).div(_Tokenomics);
+                    uint256 liquidityToken = minTokenNumberToSell.mul(taxes.liquidity).div(_Taxes);
                     Utils.addLiquidity(
                         address(pancakeRouter),
                         owner(),
                         liquidityToken,
-                        deltaBalance.mul(tokenomics.liquidity).div(_Tokenomics)
+                        deltaBalance.mul(taxes.liquidity).div(_Taxes)
                     ); 
                     emit SwapAndLiquify(liquidityToken, deltaBalance, liquidityToken);
                 }          
@@ -2322,36 +2313,29 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
         uint256 initialBalance = address(this).balance;
 
-        //check triggerwallet balance
-        if (address(triggerwallet).balance < 0.1 ether && initialBalance > 0.1 ether) {
-            (bool sent, ) = payable(address(triggerwallet)).call{value: 0.1 ether}("");
-            require(sent, "Error: Cannot send gas fee");
-            initialBalance = address(this).balance;
-        }
-
         Utils.swapTokensForEth(address(pancakeRouter), minTokenNumberToSell);       
         uint256 deltaBalance = address(this).balance.sub(initialBalance);
 
-        if (tokenomics.marketing > 0) {
+        if (taxes.marketing > 0) {
             // send marketing rewards
-            (bool sentm, ) = payable(address(marketingwallet)).call{value: deltaBalance.mul(tokenomics.marketing).div(_Tokenomics)}("");
-            require(sentm, "Error: Cannot send reward");
+            (bool sentm, ) = payable(address(marketingwallet)).call{value: deltaBalance.mul(taxes.marketing).div(_Taxes)}("");
+            require(sentm, "Err: sending marketing");
         }
 
-        if (tokenomics.reserve > 0) {
+        if (taxes.reserve > 0) {
             // send resere rewards
-            (bool sentr, ) = payable(address(reservewallet)).call{value: deltaBalance.mul(tokenomics.reserve).div(_Tokenomics)}("");
-            require(sentr, "Error: Cannot send reward");
+            (bool sentr, ) = payable(address(reservewallet)).call{value: deltaBalance.mul(taxes.reserve).div(_Taxes)}("");
+            require(sentr, "Err: sending reserve");
         }
 
-        if (tokenomics.liquidity > 0) {
+        if (taxes.liquidity > 0) {
             // add liquidity to pancake
-            uint256 liquidityToken = minTokenNumberToSell.mul(tokenomics.liquidity).div(_Tokenomics);
+            uint256 liquidityToken = minTokenNumberToSell.mul(taxes.liquidity).div(_Taxes);
             Utils.addLiquidity(
                 address(pancakeRouter),
                 owner(),
                 liquidityToken,
-                deltaBalance.mul(tokenomics.liquidity).div(_Tokenomics)
+                deltaBalance.mul(taxes.liquidity).div(_Taxes)
             ); 
             emit SwapAndLiquify(liquidityToken, deltaBalance, liquidityToken);
         }
@@ -2395,7 +2379,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function migrateBnb(address payable _newadd, uint256 amount) external onlyOwner{
         require(_newadd != address(0), "Error");
         (bool success, ) = address(_newadd).call{value: amount}("");
-        require(success, "Address: unable to send value, charity may have reverted");
+        require(success, "Address: unable to send");
     }
 
     function changeThreshHoldTopUpRate(uint256 _newrate) external onlyOwner {
@@ -2420,10 +2404,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         emit changeValue("transfer tax", _transfertax);
     }
 
-    function changeTokenomics(uint256 bnbReward, uint256 liquidity, uint256 marketing, uint256 reflection, uint256 reserve) external onlyOwner {
-        require(bnbReward + liquidity + marketing + reflection + reserve == 100, "Have to be 100 in total");
-        tokenomics = Tokenomics(bnbReward, liquidity, marketing, reflection, reserve);
-        updateTokenomics();
+    function changeTaxes(uint256 bnbReward, uint256 liquidity, uint256 marketing, uint256 reflection, uint256 reserve) external onlyOwner {
+        require(bnbReward + liquidity + marketing + reflection + reserve == 100, "Not 100");
+        taxes = Taxes(bnbReward, liquidity, marketing, reflection, reserve);
+        _Reflection = taxes.reflection;
+        _Taxes = taxes.bnbReward.add
+                      (taxes.marketing).add
+                      (taxes.liquidity).add
+                      (taxes.reserve);
     }
 
     function changeBnbClaimTax(uint256 _layer1, uint256 _layer2, uint256 _layer3, uint256 _layer4, uint256 _layer5, uint256 _layer6) external onlyOwner {
@@ -2449,16 +2437,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         emit changeValue("RewardHardcap", _newvalue);
     }
 
-    function updateTokenomics() private {
-        _Reflection = tokenomics.reflection;
-        _Tokenomics = tokenomics.bnbReward.add
-                      (tokenomics.marketing).add
-                      (tokenomics.liquidity).add
-                      (tokenomics.reserve);
-    }
-
     function updatePairAddress(address _pairAddress, bool _enable) external onlyOwner {
-        require(pairAddresses[_pairAddress] != _enable, "Will have no effect..");
         pairAddresses[_pairAddress] = _enable;
     }
 
@@ -2505,7 +2484,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         uint96 balance = uint96(balanceOf(msg.sender)-1E9);
 
         require(stackingEnabled && !rewardStacking[msg.sender].enabled, "Not available");
-        require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: next available not reached");
+        require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: too early");
         require(balance > 15000000000000000, "Error: Wrong amount");
 
         rewardStacking[msg.sender] = StackingStruct.stacking(
@@ -2522,12 +2501,12 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         uint256 rBalance = balance * currentRate;
 
         if (_isExcluded[msg.sender]) { 
-            _tOwned[msg.sender] = _tOwned[msg.sender].sub(balance);
-            _rOwned[msg.sender] = _rOwned[msg.sender].sub(rBalance);
-            _rOwned[stackingWallet] = _rOwned[stackingWallet].add(rBalance);
+            _tOwned[msg.sender] -= balance;
+            _rOwned[msg.sender] -= rBalance;
+            _rOwned[stackingWallet] += rBalance;
         } else {
-            _rOwned[msg.sender] = _rOwned[msg.sender].sub(rBalance);
-            _rOwned[stackingWallet] = _rOwned[stackingWallet].add(rBalance);
+            _rOwned[msg.sender] -= rBalance;
+            _rOwned[stackingWallet] += rBalance;
         }
         //_tokenTransfer(msg.sender, stackingWallet, balance, false);
         emit Transfer(msg.sender, stackingWallet, balance);
@@ -2562,6 +2541,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         uint256 rewardBNB;
         uint256 rewardreinvest;
         uint256 reward = getStacked(msg.sender);
+        uint256 currentRate =  _getRate();
 
         if (perc == 100) {
             rewardBNB = reward;
@@ -2581,7 +2561,18 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             // update reinvest rewards
             userreinvested[msg.sender] += expectedtoken;
             totalreinvested += expectedtoken;
-            _tokenTransfer(address(this), msg.sender, expectedtoken, false);
+
+            uint256 rExpected = expectedtoken * currentRate;
+        
+            if (_isExcluded[msg.sender]) { 
+                _rOwned[msg.sender] += rExpected;
+                _tOwned[msg.sender] += expectedtoken;
+                _rOwned[address(this)] -= rExpected;
+            } else {
+                _rOwned[msg.sender] += rExpected;
+                _rOwned[address(this)] -= rExpected;
+            }
+            emit Transfer(stackingWallet, msg.sender, expectedtoken);
 
         }
 
@@ -2591,25 +2582,27 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             bool success;
             // deduct tax
             if (rewardBNB < 0.1 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer1).div(100);
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer1).div(100);
             } else if (rewardBNB < 0.25 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer2).div(100);
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer2).div(100);
             } else if (rewardBNB < 0.5 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer3).div(100);
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer3).div(100);
             } else if (rewardBNB < 0.75 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer4).div(100);
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer4).div(100);
             } else if (rewardBNB < 1 ether) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer5).div(100);
-            } else {
+                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer5).div(100);
+            } else if (bnbClaimTax.layer6 > 0) {
                 rewardfee = rewardBNB.mul(bnbClaimTax.layer6).div(100);
             }
-            rewardBNB -= rewardfee;
-            (success, ) = address(reservewallet).call{value: rewardfee}("");
-            require(success, " Error: Cannot send reward");
+            if (rewardfee > 0) {
+                rewardBNB -= rewardfee;
+                (success, ) = address(reservewallet).call{value: rewardfee}("");
+                require(success, "Err: sending fee");
+            }
 
             // send bnb to user
             (success, ) = address(msg.sender).call{value: rewardBNB}("");
-            require(success, "Error: Cannot withdraw reward");
+            require(success, "Err: sending reward");
 
             // update claimed rewards
             userClaimedBNB[msg.sender] += rewardBNB;
@@ -2617,27 +2610,25 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         }
 
         uint256 rate = stackingRate[msg.sender];
-        uint256 currentRate =  _getRate();
 
         if (rate > 0)
         {
-            amount = tmpstacking.amount * rate /currentRate;
+            amount = tmpstacking.amount * rate / currentRate;
         } else {
             amount = tmpstacking.amount;
         }
 
-        uint256 rAmount = amount *  currentRate;
+        uint256 rAmount = amount * currentRate;
         
         if (_isExcluded[msg.sender]) { 
-            _rOwned[msg.sender] = _rOwned[msg.sender].add(rAmount);
-            _tOwned[msg.sender] = _tOwned[msg.sender].add(amount);
-            _rOwned[stackingWallet] = _rOwned[stackingWallet].add(rAmount);
+            _rOwned[msg.sender] += rAmount;
+            _tOwned[msg.sender] += amount;
+            _rOwned[stackingWallet] -= rAmount;
         } else {
-            _rOwned[msg.sender] = _rOwned[msg.sender].add(rAmount);
-            _rOwned[stackingWallet] = _rOwned[stackingWallet].sub(rAmount);
+            _rOwned[msg.sender] += rAmount;
+            _rOwned[stackingWallet] -= rAmount;
         }
         emit Transfer(stackingWallet, msg.sender, amount);
-        //_tokenTransfer(stackingWallet, msg.sender, amount, false);
 
         StackingStruct.stacking memory tmpStack;
         rewardStacking[msg.sender] = tmpStack;
@@ -2645,16 +2636,6 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         // update rewardCycleBlock
         nextAvailableClaimDate[msg.sender] = block.timestamp + rewardCycleBlock;
         emit ClaimBNBSuccessfully(msg.sender,reward,nextAvailableClaimDate[msg.sender]);
-    }
-
-    function withdrawBEB20(address _token, uint256 amount) external onlyOwner {
-        uint256 tokenBalance = IBEP20(_token).balanceOf(address(this));
-        if (amount == 0) {
-            amount = tokenBalance;
-        } else {
-            require(amount <= tokenBalance, "Wrong amount");
-        }
-        IBEP20(_token).transfer(msg.sender, amount);
     }
 
 }
