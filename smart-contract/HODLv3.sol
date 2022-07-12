@@ -682,16 +682,7 @@ contract Ownable is Context, Initializable {
         address indexed newOwner
     );
 
-    /**
-     * @dev Initializes the contract setting the deployer as the initial owner.
-     */
     constructor() {}
-
-    function initOwner(address owner_) public initializer {
-        _owner = owner_;
-        emit OwnershipTransferred(address(0), owner_);
-    }
-
     /**
      * @dev Returns the address of the current owner.
      */
@@ -2076,7 +2067,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     mapping(address => uint256) private stackingRate;
 
     function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner {
-        require(maxTxPercent <= 100, "Error");
+        require(maxTxPercent <= 100 && maxTxPercent > 0, "Error");
         _maxTxAmount = _tTotal.mul(maxTxPercent).div(100000);
         emit SetMaxTxPercent(maxTxPercent);
     }
@@ -2344,6 +2335,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function changeRewardCycleBlock(uint256 newcycle) external onlyOwner {
         require(newcycle >= 86400, "Error"); //min 1 day
         rewardCycleBlock = newcycle;
+        emit changeValue("RewardCycleBlock", newcycle);
     }
 
     function changeReserveWallet(address payable _newaddress) external onlyOwner {
@@ -2384,6 +2376,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     function changeThreshHoldTopUpRate(uint256 _newrate) external onlyOwner {
         threshHoldTopUpRate = _newrate;
+        emit changeValue("ThreshHoldTopUpRate", _newrate);
     }
 
     function changeSellTax(uint256 _selltax) external onlyOwner {
