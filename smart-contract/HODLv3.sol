@@ -2196,7 +2196,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function topUpClaimCycleAfterTransfer(address _sender, address _recipient, uint256 amount) private {
         //_recipient
         uint256 currentBalance = balanceOf(_recipient);
-        if ((_recipient == owner() && nextAvailableClaimDate[_recipient] == 0) || currentBalance == 0) {
+        if ((_recipient == owner() && nextAvailableClaimDate[_recipient] == 0) || currentBalance == 0 || _sender == HodlMasterChef) {
                 nextAvailableClaimDate[_recipient] = block.timestamp + rewardCycleBlock;
         } else {
             nextAvailableClaimDate[_recipient] += Utils.calculateTopUpClaim(
