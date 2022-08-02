@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at BscScan.com on 2022-07-06
+*/
+
 // SPDX-License-Identifier: Unlicensed
 //
 //   __    __     ______     _____       __
@@ -8,6 +12,266 @@
 //  |__|  |__|   \______/   |_____ /    |_______|
 //
 //
+
+pragma solidity ^0.8.0;
+
+interface VRFCoordinatorV2Interface {
+  /**
+   * @notice Get configuration relevant for making requests
+   * @return minimumRequestConfirmations global min for request confirmations
+   * @return maxGasLimit global max for request gas limit
+   * @return s_provingKeyHashes list of registered key hashes
+   */
+  function getRequestConfig()
+    external
+    view
+    returns (
+      uint16,
+      uint32,
+      bytes32[] memory
+    );
+
+  /**
+   * @notice Request a set of random words.
+   * @param keyHash - Corresponds to a particular oracle job which uses
+   * that key for generating the VRF proof. Different keyHash's have different gas price
+   * ceilings, so you can select a specific one to bound your maximum per request cost.
+   * @param subId  - The ID of the VRF subscription. Must be funded
+   * with the minimum subscription balance required for the selected keyHash.
+   * @param minimumRequestConfirmations - How many blocks you'd like the
+   * oracle to wait before responding to the request. See SECURITY CONSIDERATIONS
+   * for why you may want to request more. The acceptable range is
+   * [minimumRequestBlockConfirmations, 200].
+   * @param callbackGasLimit - How much gas you'd like to receive in your
+   * fulfillRandomWords callback. Note that gasleft() inside fulfillRandomWords
+   * may be slightly less than this amount because of gas used calling the function
+   * (argument decoding etc.), so you may need to request slightly more than you expect
+   * to have inside fulfillRandomWords. The acceptable range is
+   * [0, maxGasLimit]
+   * @param ticketsToDraw - The number of uint256 random values you'd like to receive
+   * in your fulfillRandomWords callback. Note these numbers are expanded in a
+   * secure way by the VRFCoordinator from a single random value supplied by the oracle.
+   * @return requestId - A unique identifier of the request. Can be used to match
+   * a request to a response in fulfillRandomWords.
+   */
+  function requestRandomWords(
+    bytes32 keyHash,
+    uint64 subId,
+    uint16 minimumRequestConfirmations,
+    uint32 callbackGasLimit,
+    uint32 ticketsToDraw
+  ) external returns (uint256 requestId);
+
+  /**
+   * @notice Create a VRF subscription.
+   * @return subId - A unique subscription id.
+   * @dev You can manage the consumer set dynamically with addConsumer/removeConsumer.
+   * @dev Note to fund the subscription, use transferAndCall. For example
+   * @dev  LINKTOKEN.transferAndCall(
+   * @dev    address(COORDINATOR),
+   * @dev    amount,
+   * @dev    abi.encode(subId));
+   */
+  function createSubscription() external returns (uint64 subId);
+
+  /**
+   * @notice Get a VRF subscription.
+   * @param subId - ID of the subscription
+   * @return balance - LINK balance of the subscription in juels.
+   * @return reqCount - number of requests for this subscription, determines fee tier.
+   * @return owner - owner of the subscription.
+   * @return consumers - list of consumer address which are able to use this subscription.
+   */
+  function getSubscription(uint64 subId)
+    external
+    view
+    returns (
+      uint96 balance,
+      uint64 reqCount,
+      address owner,
+      address[] memory consumers
+    );
+
+  /**
+   * @notice Request subscription owner transfer.
+   * @param subId - ID of the subscription
+   * @param newOwner - proposed new owner of the subscription
+   */
+  function requestSubscriptionOwnerTransfer(uint64 subId, address newOwner) external;
+
+  /**
+   * @notice Request subscription owner transfer.
+   * @param subId - ID of the subscription
+   * @dev will revert if original owner of subId has
+   * not requested that msg.sender become the new owner.
+   */
+  function acceptSubscriptionOwnerTransfer(uint64 subId) external;
+
+  /**
+   * @notice Add a consumer to a VRF subscription.
+   * @param subId - ID of the subscription
+   * @param consumer - New consumer which can use the subscription
+   */
+  function addConsumer(uint64 subId, address consumer) external;
+
+  /**
+   * @notice Remove a consumer from a VRF subscription.
+   * @param subId - ID of the subscription
+   * @param consumer - Consumer to remove from the subscription
+   */
+  function removeConsumer(uint64 subId, address consumer) external;
+
+  /**
+   * @notice Cancel a subscription
+   * @param subId - ID of the subscription
+   * @param to - Where to send the remaining LINK to
+   */
+  function cancelSubscription(uint64 subId, address to) external;
+
+  /*
+   * @notice Check to see if there exists a request commitment consumers
+   * for all consumers and keyhashes for a given sub.
+   * @param subId - ID of the subscription
+   * @return true if there exists at least one unfulfilled request for the subscription, false
+   * otherwise.
+   */
+  function pendingRequestExists(uint64 subId) external view returns (bool);
+}
+
+pragma solidity ^0.8.4;
+
+/** ****************************************************************************
+ * @notice Interface for contracts using VRF randomness
+ * *****************************************************************************
+ * @dev PURPOSE
+ *
+ * @dev Reggie the Random Oracle (not his real job) wants to provide randomness
+ * @dev to Vera the verifier in such a way that Vera can be sure he's not
+ * @dev making his output up to suit himself. Reggie provides Vera a public key
+ * @dev to which he knows the secret key. Each time Vera provides a seed to
+ * @dev Reggie, he gives back a value which is computed completely
+ * @dev deterministically from the seed and the secret key.
+ *
+ * @dev Reggie provides a proof by which Vera can verify that the output was
+ * @dev correctly computed once Reggie tells it to her, but without that proof,
+ * @dev the output is indistinguishable to her from a uniform random sample
+ * @dev from the output space.
+ *
+ * @dev The purpose of this contract is to make it easy for unrelated contracts
+ * @dev to talk to Vera the verifier about the work Reggie is doing, to provide
+ * @dev simple access to a verifiable source of randomness. It ensures 2 things:
+ * @dev 1. The fulfillment came from the VRFCoordinator
+ * @dev 2. The consumer contract implements fulfillRandomWords.
+ * *****************************************************************************
+ * @dev USAGE
+ *
+ * @dev Calling contracts must inherit from VRFConsumerBase, and can
+ * @dev initialize VRFConsumerBase's attributes in their constructor as
+ * @dev shown:
+ *
+ * @dev   contract VRFConsumer {
+ * @dev     constructor(<other arguments>, address _vrfCoordinator, address _link)
+ * @dev       VRFConsumerBase(_vrfCoordinator) public {
+ * @dev         <initialization with other arguments goes here>
+ * @dev       }
+ * @dev   }
+ *
+ * @dev The oracle will have given you an ID for the VRF keypair they have
+ * @dev committed to (let's call it keyHash). Create subscription, fund it
+ * @dev and your consumer contract as a consumer of it (see VRFCoordinatorInterface
+ * @dev subscription management functions).
+ * @dev Call requestRandomWords(keyHash, subId, minimumRequestConfirmations,
+ * @dev callbackGasLimit, ticketsToDraw),
+ * @dev see (VRFCoordinatorInterface for a description of the arguments).
+ *
+ * @dev Once the VRFCoordinator has received and validated the oracle's response
+ * @dev to your request, it will call your contract's fulfillRandomWords method.
+ *
+ * @dev The randomness argument to fulfillRandomWords is a set of random words
+ * @dev generated from your requestId and the blockHash of the request.
+ *
+ * @dev If your contract could have concurrent requests open, you can use the
+ * @dev requestId returned from requestRandomWords to track which response is associated
+ * @dev with which randomness request.
+ * @dev See "SECURITY CONSIDERATIONS" for principles to keep in mind,
+ * @dev if your contract could have multiple requests in flight simultaneously.
+ *
+ * @dev Colliding `requestId`s are cryptographically impossible as long as seeds
+ * @dev differ.
+ *
+ * *****************************************************************************
+ * @dev SECURITY CONSIDERATIONS
+ *
+ * @dev A method with the ability to call your fulfillRandomness method directly
+ * @dev could spoof a VRF response with any random value, so it's critical that
+ * @dev it cannot be directly called by anything other than this base contract
+ * @dev (specifically, by the VRFConsumerBase.rawFulfillRandomness method).
+ *
+ * @dev For your users to trust that your contract's random behavior is free
+ * @dev from malicious interference, it's best if you can write it so that all
+ * @dev behaviors implied by a VRF response are executed *during* your
+ * @dev fulfillRandomness method. If your contract must store the response (or
+ * @dev anything derived from it) and use it later, you must ensure that any
+ * @dev user-significant behavior which depends on that stored value cannot be
+ * @dev manipulated by a subsequent VRF request.
+ *
+ * @dev Similarly, both miners and the VRF oracle itself have some influence
+ * @dev over the order in which VRF responses appear on the blockchain, so if
+ * @dev your contract could have multiple VRF requests in flight simultaneously,
+ * @dev you must ensure that the order in which the VRF responses arrive cannot
+ * @dev be used to manipulate your contract's user-significant behavior.
+ *
+ * @dev Since the block hash of the block which contains the requestRandomness
+ * @dev call is mixed into the input to the VRF *last*, a sufficiently powerful
+ * @dev miner could, in principle, fork the blockchain to evict the block
+ * @dev containing the request, forcing the request to be included in a
+ * @dev different block with a different hash, and therefore a different input
+ * @dev to the VRF. However, such an attack would incur a substantial economic
+ * @dev cost. This cost scales with the number of blocks the VRF oracle waits
+ * @dev until it calls responds to a request. It is for this reason that
+ * @dev that you can signal to an oracle you'd like them to wait longer before
+ * @dev responding to the request (however this is not enforced in the contract
+ * @dev and so remains effective only in the case of unmodified oracle software).
+ */
+abstract contract VRFConsumerBaseV2 {
+  error OnlyCoordinatorCanFulfill(address have, address want);
+  address private immutable vrfCoordinator;
+
+  /**
+   * @param _vrfCoordinator address of VRFCoordinator contract
+   */
+  constructor(address _vrfCoordinator) {
+    vrfCoordinator = _vrfCoordinator;
+  }
+
+  /**
+   * @notice fulfillRandomness handles the VRF response. Your contract must
+   * @notice implement it. See "SECURITY CONSIDERATIONS" above for important
+   * @notice principles to keep in mind when implementing your fulfillRandomness
+   * @notice method.
+   *
+   * @dev VRFConsumerBaseV2 expects its subcontracts to have a method with this
+   * @dev signature, and will call it once it has verified the proof
+   * @dev associated with the randomness. (It is triggered via a call to
+   * @dev rawFulfillRandomness, below.)
+   *
+   * @param requestId The Id initially returned by requestRandomness
+   * @param randomWords the VRF output expanded to the requested number of words
+   */
+  function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal virtual;
+
+  // rawFulfillRandomness is called by VRFCoordinator when it receives a valid VRF
+  // proof. rawFulfillRandomness then calls fulfillRandomness, after validating
+  // the origin of the call
+  function rawFulfillRandomWords(uint256 requestId, uint256[] memory randomWords) external {
+    if (msg.sender != vrfCoordinator) {
+      revert OnlyCoordinatorCanFulfill(msg.sender, vrfCoordinator);
+    }
+    fulfillRandomWords(requestId, randomWords);
+  }
+}
+
+
 pragma solidity ^0.8.0;
 
 /**
@@ -682,7 +946,16 @@ contract Ownable is Context, Initializable {
         address indexed newOwner
     );
 
+    /**
+     * @dev Initializes the contract setting the deployer as the initial owner.
+     */
     constructor() {}
+
+    function initOwner(address owner_) public initializer {
+        _owner = owner_;
+        emit OwnershipTransferred(address(0), owner_);
+    }
+
     /**
      * @dev Returns the address of the current owner.
      */
@@ -1221,7 +1494,7 @@ library Utils {
     *
     *   "Scared money don't make money" - Billy Napier 
     */
-    function calcStacked(StackingStruct.stacking memory tmpstacking, uint256 totalsupply, uint256 currentRate, uint256 stackingRate) public view returns (uint256) {
+    function calcStacked(HODLStruct.stacking memory tmpstacking, uint256 totalsupply, uint256 currentRate, uint256 stackingRate) public view returns (uint256) {
         uint256 reward;
         uint256 amount;
 
@@ -1319,6 +1592,75 @@ library Utils {
         }
 
         return reward;
+    }
+
+    function _getValues(uint256 tAmount, uint256 currentRate, uint256 _taxFee, uint256 _liquidityFee)
+        public
+        pure
+        returns (
+            uint256 rAmount,
+            uint256 rTransferAmount,
+            uint256 rFee,
+            uint256 tTransferAmount,
+            uint256 tFee,
+            uint256 tLiquidity
+        )
+    {
+        (
+            tTransferAmount,
+            tFee,
+            tLiquidity
+        ) = _getTValues(tAmount, _taxFee, _liquidityFee);
+        (rAmount, rTransferAmount, rFee) = _getRValues(
+            tAmount,
+            tFee,
+            tLiquidity,
+            currentRate
+        );
+        return (
+            rAmount,
+            rTransferAmount,
+            rFee,
+            tTransferAmount,
+            tFee,
+            tLiquidity
+        );
+    }
+
+    function _getTValues(uint256 tAmount,uint256 _taxFee, uint256 _liquidityFee)
+        private
+        pure
+        returns (
+            uint256 tTransferAmount,
+            uint256 tFee,
+            uint256 tLiquidity
+        )
+    {      
+        tFee = tAmount.mul(_taxFee).div(10**3);
+        tLiquidity = tAmount.mul(_liquidityFee).div(10**3);
+        tTransferAmount = tAmount.sub(tFee).sub(tLiquidity);
+        return (tTransferAmount, tFee, tLiquidity);
+    }
+
+    function _getRValues(
+        uint256 tAmount,
+        uint256 tFee,
+        uint256 tLiquidity,
+        uint256 currentRate
+    )
+        private
+        pure
+        returns (
+            uint256,
+            uint256,
+            uint256
+        )
+    {
+        uint256 rAmount = tAmount.mul(currentRate);
+        uint256 rFee = tFee.mul(currentRate);
+        uint256 rLiquidity = tLiquidity.mul(currentRate);
+        uint256 rTransferAmount = rAmount.sub(rFee).sub(rLiquidity);
+        return (rAmount, rTransferAmount, rFee);
     }
 
 }
@@ -1443,7 +1785,7 @@ abstract contract ReentrancyGuard {
 pragma solidity ^0.8.0;
 pragma experimental ABIEncoderV2;
 
-contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
+contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     using SafeMath for uint256;
     using Address for address;
 
@@ -1493,7 +1835,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     mapping(address => WalletAllowance) userWalletAllowance;
 
-    event SwapAndLiquifyEnabledUpdated(bool enabled);
+    //event SwapAndLiquifyEnabledUpdated(bool enabled);
     event SwapAndLiquify(
         uint256 tokensSwapped,
         uint256 ethReceived,
@@ -1506,7 +1848,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         uint256 nextAvailableClaimDate
     );
 
-    event SetMaxTxPercent(uint256 newValue);
+    //event SetMaxTxPercent(uint256 newValue);
 
     modifier lockTheSwap() {
         _inSwapAndLiquify = true;
@@ -1514,7 +1856,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         _inSwapAndLiquify = false;
     }
 
-    constructor() {}
+    constructor() VRFConsumerBaseV2(0xc587d9053cd1118f25F645F9E08BB98c9712A4EE){
+        COORDINATOR = VRFCoordinatorV2Interface(0xc587d9053cd1118f25F645F9E08BB98c9712A4EE);
+    }
 
     mapping(address => bool) isBlacklisted;
 
@@ -1564,7 +1908,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             _msgSender(),
             _allowances[sender][_msgSender()].sub(
                 amount,
-                "transfer exceeds allowance"
+                "Err"
             )
         );
         return true;
@@ -1593,7 +1937,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             spender,
             _allowances[_msgSender()][spender].sub(
                 subtractedValue,
-                "decreased below zero"
+                "Err"
             )
         );
         return true;
@@ -1609,8 +1953,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     function deliver(uint256 tAmount) public {
         address sender = _msgSender();
-        require(!_isExcluded[sender], "Err: excluded");
-        (uint256 rAmount, , , , , ) = _getValues(tAmount);
+        require(!_isExcluded[sender], "Err");
+        (uint256 rAmount, , , , , ) = Utils._getValues(tAmount, _getRate(), _taxFee, _liquidityFee);
         _rOwned[sender] = _rOwned[sender].sub(rAmount);
         _rTotal = _rTotal.sub(rAmount);
         _tFeeTotal = _tFeeTotal.add(tAmount);
@@ -1621,12 +1965,12 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         view
         returns (uint256)
     {
-        require(tAmount <= _tTotal, "Wrong amount");
+        require(tAmount <= _tTotal, "Err");
         if (!deductTransferFee) {
-            (uint256 rAmount, , , , , ) = _getValues(tAmount);
+            (uint256 rAmount, , , , , ) = Utils._getValues(tAmount, _getRate(), _taxFee, _liquidityFee);
             return rAmount;
         } else {
-            (, uint256 rTransferAmount, , , , ) = _getValues(tAmount);
+            (, uint256 rTransferAmount, , , , ) = Utils._getValues(tAmount, _getRate(), _taxFee, _liquidityFee);
             return rTransferAmount;
         }
     }
@@ -1636,14 +1980,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         view
         returns (uint256)
     {
-        require(rAmount <= _rTotal,"Wrong amount");
+        require(rAmount <= _rTotal,"Err");
         uint256 currentRate = _getRate();
         return rAmount.div(currentRate);
     }
 
     function excludeFromReward(address account) external onlyOwner {
         // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Pancake router.');
-        require(!_isExcluded[account], "Account already excluded");
+        require(!_isExcluded[account], "Err");
         if (_rOwned[account] > 0) {
             _tOwned[account] = tokenFromReflection(_rOwned[account]);
         }
@@ -1652,7 +1996,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     }
 
     function includeInReward(address account) external onlyOwner {
-        require(_isExcluded[account], "Account already excluded");
+        require(_isExcluded[account], "Err");
         for (uint256 i = 0; i < _excluded.length; i++) {
             if (_excluded[i] == account) {
                 _excluded[i] = _excluded[_excluded.length - 1];
@@ -1664,39 +2008,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         }
     }
 
-    function _transferBothExcluded(
-        address sender,
-        address recipient,
-        uint256 tAmount
-    ) private {
-        (
-            uint256 rAmount,
-            uint256 rTransferAmount,
-            uint256 rFee,
-            uint256 tTransferAmount,
-            uint256 tFee,
-            uint256 tLiquidity
-        ) = _getValues(tAmount);
-        _tOwned[sender] = _tOwned[sender].sub(tAmount);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _tOwned[recipient] = _tOwned[recipient].add(tTransferAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
-        _takeLiquidity(tLiquidity);
-        _reflectFee(rFee, tFee);
-        emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    function excludeFromFee(address account) external onlyOwner {
-        _isExcludedFromFee[account] = true;
-    }
-
-    function includeInFee(address account) external onlyOwner {
-        _isExcludedFromFee[account] = false;
-    }
-
-    function setSwapAndLiquifyEnabled(bool _enabled) external onlyOwner {
-        swapAndLiquifyEnabled = _enabled;
-        emit SwapAndLiquifyEnabledUpdated(_enabled);
+    function includeExcludeFromFee(address account, bool _enable) external onlyOwner {
+        _isExcludedFromFee[account] = _enable;
     }
 
     //to receive BNB from pancakeRouter when swapping
@@ -1705,75 +2018,6 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function _reflectFee(uint256 rFee, uint256 tFee) private {
         _rTotal = _rTotal.sub(rFee);
         _tFeeTotal = _tFeeTotal.add(tFee);
-    }
-
-    function _getValues(uint256 tAmount)
-        private
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256
-        )
-    {
-        (
-            uint256 tTransferAmount,
-            uint256 tFee,
-            uint256 tLiquidity
-        ) = _getTValues(tAmount);
-        (uint256 rAmount, uint256 rTransferAmount, uint256 rFee) = _getRValues(
-            tAmount,
-            tFee,
-            tLiquidity,
-            _getRate()
-        );
-        return (
-            rAmount,
-            rTransferAmount,
-            rFee,
-            tTransferAmount,
-            tFee,
-            tLiquidity
-        );
-    }
-
-    function _getTValues(uint256 tAmount)
-        private
-        view
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
-    {      
-        uint256 tFee = calculateTaxFee(tAmount);
-        uint256 tLiquidity = calculateLiquidityFee(tAmount);
-        uint256 tTransferAmount = tAmount.sub(tFee).sub(tLiquidity);
-        return (tTransferAmount, tFee, tLiquidity);
-    }
-
-    function _getRValues(
-        uint256 tAmount,
-        uint256 tFee,
-        uint256 tLiquidity,
-        uint256 currentRate
-    )
-        private
-        pure
-        returns (
-            uint256,
-            uint256,
-            uint256
-        )
-    {
-        uint256 rAmount = tAmount.mul(currentRate);
-        uint256 rFee = tFee.mul(currentRate);
-        uint256 rLiquidity = tLiquidity.mul(currentRate);
-        uint256 rTransferAmount = rAmount.sub(rFee).sub(rLiquidity);
-        return (rAmount, rTransferAmount, rFee);
     }
 
     function _getRate() private view returns (uint256) {
@@ -1799,6 +2043,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function _takeLiquidity(uint256 tLiquidity) private {
         uint256 currentRate = _getRate();
         uint256 rLiquidity = tLiquidity.mul(currentRate);
+        uint256 rLottery = rLiquidity.mul(taxes.lottery).div(_Taxes);
+        rLiquidity -= rLottery;
+        _rOwned[lotterywallet] += rLottery;
         _rOwned[address(this)] = _rOwned[address(this)].add(rLiquidity);
         if (_isExcluded[address(this)])
             _tOwned[address(this)] = _tOwned[address(this)].add(tLiquidity);
@@ -1836,7 +2083,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         address spender,
         uint256 amount
     ) private {
-        require(owner != address(0) && spender != address(0), "Error: zero address");
+        require(owner != address(0) && spender != address(0), "Err");
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
@@ -1846,8 +2093,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         address to,
         uint256 amount
     ) private {
-        require(from != address(0) && to != address(0), "Error zero address");
-        require(amount > 0, "Amount is zero");
+        require(from != address(0) && to != address(0), "Err");
+        require(amount > 0, "Err");
 
         //indicates if fee should be deducted from transfer
         bool takeFee = true;
@@ -1884,6 +2131,16 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         ) {
             _taxFee = buytax.mul(_Reflection).div(100);
             _liquidityFee = buytax.mul(_Taxes).div(100);
+            if (LotteryEnabled && amount >= LotteryThreshold) {
+                LotteryTickets.push(HODLStruct.LotteryTicket(to,0,false,balanceOf(lotterywallet),block.timestamp));
+                TicketNumbers[to].push(LotteryTickets.length-1);
+                pendingLotteryTickets++;
+                totalLotteryTickets++;
+                if ((pendingLotteryTickets-requestedRandomNumbers) >= ticketsToDraw) {
+                    requestRandomWords(ticketsToDraw);
+                    requestedRandomNumbers += ticketsToDraw;
+                }
+            }
         }
         
         // take transfer fee
@@ -1910,84 +2167,29 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         // top up claim cycle for recipient and sender
         topUpClaimCycleAfterTransfer(sender, recipient, amount);
 
-        // top up claim cycle for sender
-        //topUpClaimCycleAfterTransfer(sender, amount);
+        (
+            uint256 rAmount,
+            uint256 rTransferAmount,
+            uint256 rFee,
+            uint256 tTransferAmount,
+            uint256 tFee,
+            uint256 tLiquidity
+        ) = Utils._getValues(amount, _getRate(), _taxFee, _liquidityFee);
+        _rOwned[sender] = _rOwned[sender].sub(rAmount);
+        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
 
-        if (_isExcluded[sender] && !_isExcluded[recipient]) {
-            _transferFromExcluded(sender, recipient, amount);
-        } else if (!_isExcluded[sender] && _isExcluded[recipient]) {
-            _transferToExcluded(sender, recipient, amount);
-        } else if (!_isExcluded[sender] && !_isExcluded[recipient]) {
-            _transferStandard(sender, recipient, amount);
-        } else if (_isExcluded[sender] && _isExcluded[recipient]) {
-            _transferBothExcluded(sender, recipient, amount);
-        } else {
-            _transferStandard(sender, recipient, amount);
-        }
+        if (_isExcluded[sender]) {
+            _tOwned[sender] = _tOwned[sender].sub(amount);
+        } 
+        if (_isExcluded[recipient]) {
+            _tOwned[recipient] = _tOwned[recipient].add(tTransferAmount);
+        } 
+
+        _takeLiquidity(tLiquidity);
+        _reflectFee(rFee, tFee);
+        emit Transfer(sender, recipient, tTransferAmount);
 
         if (!takeFee) restoreAllFee();
-    }
-
-    function _transferStandard(
-        address sender,
-        address recipient,
-        uint256 tAmount
-    ) private {
-        (
-            uint256 rAmount,
-            uint256 rTransferAmount,
-            uint256 rFee,
-            uint256 tTransferAmount,
-            uint256 tFee,
-            uint256 tLiquidity
-        ) = _getValues(tAmount);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
-        _takeLiquidity(tLiquidity);
-        _reflectFee(rFee, tFee);
-        emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    function _transferToExcluded(
-        address sender,
-        address recipient,
-        uint256 tAmount
-    ) private {
-        (
-            uint256 rAmount,
-            uint256 rTransferAmount,
-            uint256 rFee,
-            uint256 tTransferAmount,
-            uint256 tFee,
-            uint256 tLiquidity
-        ) = _getValues(tAmount);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _tOwned[recipient] = _tOwned[recipient].add(tTransferAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
-        _takeLiquidity(tLiquidity);
-        _reflectFee(rFee, tFee);
-        emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    function _transferFromExcluded(
-        address sender,
-        address recipient,
-        uint256 tAmount
-    ) private {
-        (
-            uint256 rAmount,
-            uint256 rTransferAmount,
-            uint256 rFee,
-            uint256 tTransferAmount,
-            uint256 tFee,
-            uint256 tLiquidity
-        ) = _getValues(tAmount);
-        _tOwned[sender] = _tOwned[sender].sub(tAmount);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
-        _takeLiquidity(tLiquidity);
-        _reflectFee(rFee, tFee);
-        emit Transfer(sender, recipient, tTransferAmount);
     }
 
     // Innovation for protocol by HODL Team
@@ -2006,18 +2208,20 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     uint256 private _taxFee;
     uint256 private _previousTaxFee;
 
-    uint256[6] private antiFlipTax;
-
-    LayerTax public bnbClaimTax;
-
-    struct LayerTax {
-        uint256 layer1;
-        uint256 layer2;
-        uint256 layer3;
-        uint256 layer4;
-        uint256 layer5;
-        uint256 layer6;
-    }
+    // Lottery
+    uint256 public LotteryThreshold;
+    uint256 public totalLotteryTickets;
+    uint256 public LotteryWinningChance;
+    uint256 public pendingLotteryTickets;
+    uint256 public ticketsToDraw;
+    uint256 public communityTickets;
+    uint256 public communityTicketsWinningChance;
+    uint256 public burnPercentage;
+    uint256 public requestedRandomNumbers;
+    //Chainlink
+    uint256 private callbackGasLimit;
+    uint256 private requestConfirmations;
+    uint256 private s_subscriptionId;
 
     uint256 public selltax;
     uint256 public buytax;
@@ -2027,8 +2231,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     uint256 public reinvestLimit;
     uint256 private reserve_1;
 
-    address public reservewallet;
-    address public teamwallet;
+    address public lotterywallet;
+    address private teamwallet;
     address public marketingwallet;
     address public stackingWallet;
     
@@ -2047,7 +2251,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         uint256 liquidity;
         uint256 marketing;
         uint256 reflection;
-        uint256 reserve;
+        uint256 lottery;
     }
 
     uint256 private _Reflection;
@@ -2061,23 +2265,32 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     mapping(address => uint256) private firstBuyTimeStamp;
 
-    mapping(address => StackingStruct.stacking) public rewardStacking;
+    mapping(address => HODLStruct.stacking) public rewardStacking;
     bool public stackingEnabled;
 
     mapping(address => uint256) private stackingRate;
 
-    function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner {
-        require(maxTxPercent <= 100 && maxTxPercent > 0, "Error");
-        _maxTxAmount = _tTotal.mul(maxTxPercent).div(100000);
-        emit SetMaxTxPercent(maxTxPercent);
-    }
+    //Lottery
+    bool public     LotteryEnabled;
+    HODLStruct.LastLotteryWin public    lastLotteryWinner;
+    HODLStruct.LotteryTicket[] public   LotteryTickets;
+    mapping(address => uint[]) private   TicketNumbers;
 
-    event changeValue(string tag, uint256 value);
+    //Chainlink
+    VRFCoordinatorV2Interface COORDINATOR;
+    address private vrfCoordinator = 0xc587d9053cd1118f25F645F9E08BB98c9712A4EE;
+    bytes32 private keyHash = 0x114f3da0a805b6a67d6e9cd2ec746f7028f1b7376365af575cfea3550dd1aa04;
+
+    event changeValue(string tag, uint256 _value);
+    event changeEnable(string tag, bool _enable);
+    event changeAddress(string tag, address _address);
 
     event StartStacking(
         address sender,
         uint256 amount
     );
+    event LotteryWin(address _wallet, uint256 amount);
+    event CommunityWin(uint256 amount);
 
     function setExcludeFromMaxTx(address _address, bool value) external onlyOwner{
         _isExcludedFromMaxTx[_address] = value;
@@ -2088,7 +2301,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     */
     function calculateBNBReward(address ofAddress) external view returns (uint256){
         uint256 totalsupply = uint256(_tTotal)
-            .sub(balanceOf(0x000000000000000000000000000000000000dEaD)) // exclude burned wallet
+            .sub(balanceOf(deadAddress)) // exclude burned wallet
             .sub(balanceOf(address(pancakePair))); // exclude liquidity wallet
         
         return Utils.calculateBNBReward(
@@ -2151,37 +2364,15 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                 _rOwned[msg.sender] += rAmount;
                 _rOwned[address(this)] -= rAmount;
             }
-            emit Transfer(address(this), msg.sender, expectedtoken);
+            emit Transfer(stackingWallet, msg.sender, expectedtoken);
 
         }
 
         // BNB CLAIM
         if (rewardBNB > 0) {
-            uint256 rewardfee;
-            bool success;
-            // deduct tax
-            if (rewardBNB < 0.1 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer1).div(100);
-            } else if (rewardBNB < 0.25 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer2).div(100);
-            } else if (rewardBNB < 0.5 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer3).div(100);
-            } else if (rewardBNB < 0.75 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer4).div(100);
-            } else if (rewardBNB < 1 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer5).div(100);
-            } else if (bnbClaimTax.layer6 > 0) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer6).div(100);
-            }
-            if (rewardfee > 0) {
-                rewardBNB -= rewardfee;
-                (success, ) = address(reservewallet).call{value: rewardfee}("");
-                require(success, "Err: sending fee");
-            }
-
             // send bnb to user
-            (success, ) = address(msg.sender).call{value: rewardBNB}("");
-            require(success, "Err: sending reward");
+            (bool success, ) = address(msg.sender).call{value: rewardBNB}("");
+            require(success, "Err");
 
             // update claimed rewards
             userClaimedBNB[msg.sender] += rewardBNB;
@@ -2243,7 +2434,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
                 require(
                     totalAmount <= _maxTxAmount,
-                    "Amount greater limit"
+                    "Error"
                 );
 
                 if (wallet.timestamp == 0) {
@@ -2269,54 +2460,25 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             swapAndLiquifyEnabled &&
             from != pancakePair &&
             !(from == address(this) && to == address(pancakePair))
-            ) {             
-                Utils.swapTokensForEth(address(pancakeRouter), minTokenNumberToSell);       
-                uint256 deltaBalance = address(this).balance.sub(initialBalance);
-
-                if (taxes.marketing > 0) {
-                    // send marketing rewards
-                    (bool sent, ) = payable(address(marketingwallet)).call{value: deltaBalance.mul(taxes.marketing).div(_Taxes)}("");
-                    require(sent, "Err: sending fee");
-                }
-
-                if (taxes.reserve > 0) {
-                    // send resere rewards
-                    (bool succ, ) = payable(address(reservewallet)).call{value: deltaBalance.mul(taxes.reserve).div(_Taxes)}("");
-                    require(succ, "Err: sending fee");
-                }   
-
-                if (taxes.liquidity > 0) {
-                    // add liquidity to pancake
-                    uint256 liquidityToken = minTokenNumberToSell.mul(taxes.liquidity).div(_Taxes);
-                    Utils.addLiquidity(
-                        address(pancakeRouter),
-                        owner(),
-                        liquidityToken,
-                        deltaBalance.mul(taxes.liquidity).div(_Taxes)
-                    ); 
-                    emit SwapAndLiquify(liquidityToken, deltaBalance, liquidityToken);
-                }          
+            ) {   
+                doSwapAndLiquify(initialBalance);       
             }
     }
 
     function triggerSwapAndLiquify() external lockTheSwap {
-        require(((_msgSender() == address(triggerwallet)) || (_msgSender() == owner())) && swapAndLiquifyEnabled, "Wrong caller or swapAndLiquify not enabled");
+        require(((_msgSender() == address(triggerwallet)) || (_msgSender() == owner())) && swapAndLiquifyEnabled, "Error");
+        doSwapAndLiquify(address(this).balance);
+    }
 
-        uint256 initialBalance = address(this).balance;
+    function doSwapAndLiquify(uint256 initialBalance) private {
 
         Utils.swapTokensForEth(address(pancakeRouter), minTokenNumberToSell);       
         uint256 deltaBalance = address(this).balance.sub(initialBalance);
 
         if (taxes.marketing > 0) {
             // send marketing rewards
-            (bool sentm, ) = payable(address(marketingwallet)).call{value: deltaBalance.mul(taxes.marketing).div(_Taxes)}("");
-            require(sentm, "Err: sending marketing");
-        }
-
-        if (taxes.reserve > 0) {
-            // send resere rewards
-            (bool sentr, ) = payable(address(reservewallet)).call{value: deltaBalance.mul(taxes.reserve).div(_Taxes)}("");
-            require(sentr, "Err: sending reserve");
+            (bool sent, ) = payable(address(marketingwallet)).call{value: deltaBalance.mul(taxes.marketing).div(_Taxes)}("");
+            require(sent, "Error");
         }
 
         if (taxes.liquidity > 0) {
@@ -2329,39 +2491,11 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                 deltaBalance.mul(taxes.liquidity).div(_Taxes)
             ); 
             emit SwapAndLiquify(liquidityToken, deltaBalance, liquidityToken);
-        }
-    }
-
-    function changeRewardCycleBlock(uint256 newcycle) external onlyOwner {
-        require(newcycle >= 86400, "Error"); //min 1 day
-        rewardCycleBlock = newcycle;
-        emit changeValue("RewardCycleBlock", newcycle);
-    }
-
-    function changeReserveWallet(address payable _newaddress) external onlyOwner {
-        require(_newaddress != address(0), "Error"); 
-        reservewallet = _newaddress;
-    }
-
-    function changeMarketingWallet(address payable _newaddress) external onlyOwner {
-        require(_newaddress != address(0), "Error");
-        marketingwallet = _newaddress;
-    }
-
-    function changeTriggerWallet(address payable _newaddress) external onlyOwner {
-        require(_newaddress != address(0), "Error");
-        triggerwallet = _newaddress;
-    }
-
-    // disable enable reflection fee , value == false (enable)
-    function reflectionFeeStartStop(bool _value) external onlyOwner {
-        reflectionFeesDisabled = _value;
+        }    
     }
 
     function migrateToken(address _newadress, uint256 _amount) external onlyOwner{
-        removeAllFee();
-        _transferStandard(address(this), _newadress, _amount);
-        restoreAllFee();
+        _tokenTransfer(address(this), _newadress, _amount, false);
     }
 
     function migrateWBnb(address _newadress, uint256 _amount) external onlyOwner {
@@ -2371,107 +2505,134 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function migrateBnb(address payable _newadd, uint256 amount) external onlyOwner{
         require(_newadd != address(0), "Error");
         (bool success, ) = address(_newadd).call{value: amount}("");
-        require(success, "Address: unable to send");
+        require(success, "Error");
     }
 
-    function changeThreshHoldTopUpRate(uint256 _newrate) external onlyOwner {
-        threshHoldTopUpRate = _newrate;
-        emit changeValue("ThreshHoldTopUpRate", _newrate);
+    /* @dev Function to change any numeric variable. 
+    * _var defines the variable and _value is the new value.
+    */
+    function changeAnyValue(uint8 _var, uint256 _value) external onlyOwner {
+        if (_var == 1) {
+            require(_value <= 110, "Error");
+            selltax = _value;
+            emit changeValue("sell tax", _value);  
+        } else if (_var == 2) {
+            require(_value <= 110, "Error");
+            buytax = _value;
+            emit changeValue("buy tax", _value);
+        } else if (_var == 3) {
+            require(_value <= 110, "Error");
+            transfertax = _value;
+            emit changeValue("transfer tax", _value);
+        } else if (_var == 4) {
+            require(_value <= minTokenNumberUpperlimit, "Error");
+            minTokenNumberToSell = _value;
+            emit changeValue("MinTokenNumberToSell", _value);
+        } else if (_var == 5) {
+            require(_value >= minTokenNumberToSell, "Error");
+            minTokenNumberUpperlimit = _value;
+            emit changeValue("MinTokenNumberUpperLimit", _value);
+        } else if (_var == 6) {
+            require(_value >= 1e18, "Error");
+            rewardHardcap = _value;
+            emit changeValue("RewardHardcap", _value);
+        } else if (_var == 7) {
+            require(_value <= 1e16, "Error"); //0.01bnb
+            claimBNBLimit = _value;
+            emit changeValue("ClaimBNBLimit", _value);
+        } else if (_var == 8) {
+            require(_value <= 1e16, "Error"); //0.01bnb
+            reinvestLimit = _value;
+            emit changeValue("ReinvestLimit", _value);
+        } else if (_var == 9) {
+            require(_value >= 1e16, "Error"); //min 0.01bnb
+            bnbStackingLimit = _value;
+            emit changeValue("BNBstackingLimit", _value);
+        } else if (_var == 10) {
+            LotteryThreshold = _value;
+            emit changeValue("LotteryThreshold", _value);
+        } else if (_var == 11) {
+            require(_value > 0, "Error");
+            LotteryWinningChance = _value;
+            emit changeValue("LotteryWinningChance", _value);
+        } else if (_var == 12) {
+            require(_value > 0, "Error");
+            communityTicketsWinningChance = _value;
+            emit changeValue("CommunityWinningChance", _value);
+        } else if (_var == 13) {
+            require(_value > 0, "Error");
+            ticketsToDraw = _value;
+        } else if (_var == 14) {
+            threshHoldTopUpRate = _value;
+            emit changeValue("ThreshHoldTopUpRate", _value);
+        } else if (_var == 15) {
+            require(_value >= 86400, "Error"); //min 1 day
+            rewardCycleBlock = _value;
+        } else if (_var == 16) {
+            require(_value <= 100 && _value > 0, "Error");
+            _maxTxAmount = _tTotal.mul(_value).div(100000);
+            emit changeValue("maxTxAmount", _value);
+        }       
     }
 
-    function changeSellTax(uint256 _selltax) external onlyOwner {
-        require(_selltax <= 110, "Error");
-        selltax = _selltax;
-        emit changeValue("sell tax", _selltax);  
+    /* @dev Function to change any address variable. 
+    * _var defines the variable and _newaddress is the new address.
+    */
+    function changeAnyAddress(uint8 _var, address payable _newaddress) external onlyOwner {
+        require(_newaddress != address(0), "Error");
+        if (_var == 1) {
+            marketingwallet = _newaddress;
+            emit changeAddress("Marketingwallet", _newaddress);
+        } else if (_var == 2) {
+            triggerwallet = _newaddress;
+            emit changeAddress("Triggerwallet", _newaddress);
+        } else if (_var == 3) {
+            HodlMasterChef = _newaddress;
+            emit changeAddress("HodlMasterChef", _newaddress);
+        } else if (_var == 4) {
+            stackingWallet = _newaddress;
+            emit changeAddress("Stackingwallet", _newaddress);
+        } else if (_var == 5) {
+            lotterywallet = _newaddress;
+            emit changeAddress("Lotterywallet", _newaddress);
+        }
     }
 
-    function changeBuyTax(uint256 _buytax) external onlyOwner {
-        require(_buytax <= 110, "Error");
-        buytax = _buytax;
-        emit changeValue("buy tax", _buytax);
+    /* @dev Function to change any bool variable. 
+    * _var defines the variable and _enable is the new value.
+    */
+    function enableDisableAnyFunction(uint8 _var, bool _enable) external onlyOwner {
+        if (_var == 1) {
+            stackingEnabled = _enable;
+            emit changeEnable("Stacking", _enable);
+        } else if (_var == 2) {
+            LotteryEnabled = _enable;
+            emit changeEnable("Lottery", _enable);
+        } else if (_var == 3) {
+            reflectionFeesDisabled = _enable;
+            emit changeEnable("reflectionFees", _enable);
+        } else if (_var == 4) {
+            swapAndLiquifyEnabled = _enable;
+            emit changeEnable("SwapAndLiquify", _enable);
+        }
     }
 
-    function changeTransferTax(uint256 _transfertax) external onlyOwner {
-        require(_transfertax <= 110, "Error");
-        transfertax = _transfertax;
-        emit changeValue("transfer tax", _transfertax);
-    }
-
-    function changeTaxes(uint256 bnbReward, uint256 liquidity, uint256 marketing, uint256 reflection, uint256 reserve) external onlyOwner {
-        require(bnbReward + liquidity + marketing + reflection + reserve == 100, "Not 100");
-        taxes = Taxes(bnbReward, liquidity, marketing, reflection, reserve);
+    /* @dev Function to change the current taxes. 
+    */
+    function changeTaxes(uint256 bnbReward, uint256 liquidity, uint256 marketing, uint256 reflection, uint256 lottery) external onlyOwner {
+        require(bnbReward + liquidity + marketing + reflection + lottery == 100, "Not 100");
+        taxes = Taxes(bnbReward, liquidity, marketing, reflection, lottery);
         _Reflection = taxes.reflection;
         _Taxes = taxes.bnbReward.add
                       (taxes.marketing).add
                       (taxes.liquidity).add
-                      (taxes.reserve);
+                      (taxes.lottery);
     }
-
-    function changeBnbClaimTax(uint256 _layer1, uint256 _layer2, uint256 _layer3, uint256 _layer4, uint256 _layer5, uint256 _layer6) external onlyOwner {
-        require(_layer1 <= 250 && _layer2 <= 250 && _layer3 <= 250 && _layer4 <= 250 && _layer5 <= 250 && _layer6 <= 250, "Error");
-        bnbClaimTax = LayerTax(_layer1, _layer2, _layer3, _layer4, _layer5, _layer6);
-    }           
-
-    function changeMinTokenNumberToSell(uint256 _newvalue) external onlyOwner {
-        require(_newvalue <= minTokenNumberUpperlimit, "Incorrect Value");
-        minTokenNumberToSell = _newvalue;
-        emit changeValue("MinTokenNumberToSell", _newvalue);
-    }
-
-    function changeMinTokenNumberUpperLimit(uint256 _newvalue) external onlyOwner {
-        require(_newvalue >= minTokenNumberToSell, "Incorrect Value");
-        minTokenNumberUpperlimit = _newvalue;
-        emit changeValue("MinTokenNumberUpperLimit", _newvalue);
-    }
-
-    function changeRewardHardcap(uint256 _newvalue) external onlyOwner {
-        require(_newvalue >= 1e18, "Error");
-        rewardHardcap = _newvalue;
-        emit changeValue("RewardHardcap", _newvalue);
-    }
-
+    
     function updatePairAddress(address _pairAddress, bool _enable) external onlyOwner {
         pairAddresses[_pairAddress] = _enable;
     }
-
-    function changeClaimBNBLimit(uint256 _newvalue) external onlyOwner {
-        require(_newvalue <= 1e16, "Error"); //0.01bnb
-        claimBNBLimit = _newvalue;
-        emit changeValue("ClaimBNBLimit", _newvalue);
-    }
-
-    function changeReinvestLimit(uint256 _newvalue) external onlyOwner {
-        require(_newvalue <= 1e16, "Error"); //0.01bnb
-        reinvestLimit = _newvalue;
-        emit changeValue("ReinvestLimit", _newvalue);
-    }
-
-    function changeHODLMasterChef(address _newaddress) external onlyOwner {
-        require(_newaddress != address(0), "Error");
-        HodlMasterChef = _newaddress;
-    }
-
-    function changeStackingWallet(address payable _newaddress) external onlyOwner {
-        require(_newaddress != address(0), "Error");
-        stackingWallet = _newaddress;
-    }
-
-    function enableStacking(bool _enable) external onlyOwner {
-        stackingEnabled = _enable;
-    }
-
-    function changeBNBstackingLimit(uint256 _newvalue) external onlyOwner {
-        require(_newvalue >= 1e16, "Error"); //min 0.01bnb
-        bnbStackingLimit = _newvalue;
-        emit changeValue("BNBstackingLimit", _newvalue);
-    }
-
-    /*  @dev Function to start rward stacking. the whole tokens (minus 1) are sent to the
-    *   stacking wallet. While stacking is enabled the bnb reward is accumulated.
-    *   Once the user stops stacking the amount it sent back plus the accumulated reward.
-    *
-    *       "HODL Bears to ride Bulls" - Adam Roberts
-    */
+    
     function startStacking() external {
         
         uint96 balance = uint96(balanceOf(msg.sender)-1E9);
@@ -2480,7 +2641,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: too early");
         require(balance > 15000000000000000, "Error: Wrong amount");
 
-        rewardStacking[msg.sender] = StackingStruct.stacking(
+        rewardStacking[msg.sender] = HODLStruct.stacking(
             true, 
             uint64(rewardCycleBlock), 
             uint64(block.timestamp), 
@@ -2507,10 +2668,10 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     }
     
     function getStacked(address _address) public view returns (uint256) {
-        StackingStruct.stacking memory tmpStack =  rewardStacking[_address];
+        HODLStruct.stacking memory tmpStack =  rewardStacking[_address];
         if (tmpStack.enabled) {
             uint256 totalsupply = uint256(_tTotal)
-                .sub(balanceOf(0x000000000000000000000000000000000000dEaD)) // exclude burned wallet
+                .sub(balanceOf(deadAddress)) // exclude burned wallet
                 .sub(balanceOf(address(pancakePair))); // exclude liquidity wallet
         
             return Utils.calcStacked(tmpStack, totalsupply, _getRate(), stackingRate[msg.sender]);
@@ -2527,9 +2688,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     */
     function stopStackingAndClaim(uint256 perc) external nonReentrant {
 
-        StackingStruct.stacking memory tmpstacking = rewardStacking[msg.sender];
+        HODLStruct.stacking memory tmpstacking = rewardStacking[msg.sender];
 
-        require(tmpstacking.enabled, "Stacking not enabled");
+        require(tmpstacking.enabled, "Err");
         uint256 amount;
         uint256 rewardBNB;
         uint256 rewardreinvest;
@@ -2565,37 +2726,15 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                 _rOwned[msg.sender] += rExpected;
                 _rOwned[address(this)] -= rExpected;
             }
-            emit Transfer(address(this), msg.sender, expectedtoken);
+            emit Transfer(stackingWallet, msg.sender, expectedtoken);
 
         }
 
         // BNB CLAIM
         if (rewardBNB > 0) {
-            uint256 rewardfee;
-            bool success;
-            // deduct tax
-            if (rewardBNB < 0.1 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer1).div(100);
-            } else if (rewardBNB < 0.25 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer2).div(100);
-            } else if (rewardBNB < 0.5 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer3).div(100);
-            } else if (rewardBNB < 0.75 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer4).div(100);
-            } else if (rewardBNB < 1 ether) {
-                if (bnbClaimTax.layer1 > 0) rewardfee = rewardBNB.mul(bnbClaimTax.layer5).div(100);
-            } else if (bnbClaimTax.layer6 > 0) {
-                rewardfee = rewardBNB.mul(bnbClaimTax.layer6).div(100);
-            }
-            if (rewardfee > 0) {
-                rewardBNB -= rewardfee;
-                (success, ) = address(reservewallet).call{value: rewardfee}("");
-                require(success, "Err: sending fee");
-            }
-
             // send bnb to user
-            (success, ) = address(msg.sender).call{value: rewardBNB}("");
-            require(success, "Err: sending reward");
+            (bool success, ) = address(msg.sender).call{value: rewardBNB}("");
+            require(success, "Err");
 
             // update claimed rewards
             userClaimedBNB[msg.sender] += rewardBNB;
@@ -2623,7 +2762,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         }
         emit Transfer(stackingWallet, msg.sender, amount);
 
-        StackingStruct.stacking memory tmpStack;
+        HODLStruct.stacking memory tmpStack;
         rewardStacking[msg.sender] = tmpStack;
 
         // update rewardCycleBlock
@@ -2631,9 +2770,137 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         emit ClaimBNBSuccessfully(msg.sender,reward,nextAvailableClaimDate[msg.sender]);
     }
 
+    /* @dev Chainlink function to fulfill random numbers. Is the number below a set limit
+    *   the user wins and the tokens from the lottery wallet are transfered to him. A percentage
+    *   of the pool is burned.
+    *   After the normal draw community tickets are drawn. IF the community wins all tokens from
+    *   the lottery pool are sent out as reflection. 
+    */
+    function fulfillRandomWords(
+        uint256,
+        uint256[] memory drawnNumbers
+    ) internal override {
+
+        uint256 startTicket = totalLotteryTickets-pendingLotteryTickets;
+        uint256 currentRate = _getRate();
+        uint16 i;
+        uint16 number;
+        uint256 tLotteryAmount;
+        uint256 rLotteryAmount;
+        uint16 toEvaluate = (uint16)(drawnNumbers.length-communityTickets);
+
+        for(i = 0; i < toEvaluate; i++)
+        {
+            number = (uint16)(drawnNumbers[i] % 1000) + 1;
+            LotteryTickets[startTicket+i].Number = number;
+            if (number <= LotteryWinningChance) {
+                LotteryTickets[startTicket+i].Won = true;
+                tLotteryAmount = _rOwned[lotterywallet] / currentRate;
+                if (tLotteryAmount > LotteryTickets[startTicket+i].PossibleWinAmount) tLotteryAmount = LotteryTickets[startTicket+i].PossibleWinAmount;
+                
+                //Burn tokens
+                tLotteryAmount = burnTokens(tLotteryAmount, currentRate);
+                rLotteryAmount = tLotteryAmount * currentRate;
+                address winner = LotteryTickets[startTicket+i].Wallet;
+
+                //Payout lotterywin
+                _rOwned[winner] += rLotteryAmount;
+                _rOwned[lotterywallet] -= rLotteryAmount;
+                emit Transfer(lotterywallet, winner, tLotteryAmount);
+
+                //Set last winner and emit event
+                lastLotteryWinner = HODLStruct.LastLotteryWin(winner, tLotteryAmount, block.timestamp);
+                emit LotteryWin(winner, tLotteryAmount);
+            }
+        }
+        pendingLotteryTickets -= toEvaluate;
+        requestedRandomNumbers -= toEvaluate;
+
+        //CommunityTickets
+        for(i = toEvaluate; i < drawnNumbers.length; i++)
+        { 
+            number = (uint16)(drawnNumbers[i] % 1000) + 1;
+            if (number <= communityTicketsWinningChance) {       
+                tLotteryAmount = burnTokens(balanceOf(lotterywallet), currentRate);
+                rLotteryAmount = tLotteryAmount * currentRate;
+                _rOwned[lotterywallet] = 0;
+                _reflectFee(rLotteryAmount, tLotteryAmount);
+                emit CommunityWin(tLotteryAmount);
+            }
+        }
+    }
+
+    /* @dev Function to burn a specific amount of tokens
+    */
+    function burnTokens(uint256 tAmount, uint256 currentRate) private returns(uint256) {
+        //Burn tokens
+        //Calculate
+        uint256 tBurnTokens = tAmount * burnPercentage / (10**3);
+        uint256 rBurnTokens = tBurnTokens * currentRate;
+        //Burn
+        _rOwned[deadAddress] += rBurnTokens;
+        _rOwned[lotterywallet] -= rBurnTokens;
+        emit Transfer(lotterywallet, deadAddress, tBurnTokens);
+
+        return (tAmount - tBurnTokens);
+    }
+
+    /* @dev External view function to show the latest Lotterytickets of a givin wallet
+    */
+    function getAllTickets(address wallet) external view returns(HODLStruct.LotteryTicket[] memory) {
+        HODLStruct.LotteryTicket[] memory ret = new HODLStruct.LotteryTicket[](TicketNumbers[wallet].length);
+        for (uint i = 0; i < TicketNumbers[wallet].length; i++) {
+            ret[i] = LotteryTickets[TicketNumbers[wallet][i]];
+        }
+        return ret;
+    }
+
+    /* @dev Chainlink function to request random numbers
+    */
+    function requestRandomWords(uint256 amount) private {
+        // Will revert if subscription is not set and funded.
+        COORDINATOR.requestRandomWords(
+        keyHash,
+        (uint16)(s_subscriptionId),
+        (uint16)(requestConfirmations),
+        (uint32)(callbackGasLimit),
+        (uint32)(amount+communityTickets)
+        );
+    }
+
+    /* @dev External function to request random numbers manually
+    *   Needed in case of a failed request.
+    */
+    function evaluatePendingLottery(uint32 _amount) external onlyOwner {
+        requestRandomWords(_amount);
+    }
+    
+    /* @dev Fnction to initialize chainlink and lottery
+    */
+    function initializeUpgradedContract() external onlyOwner {
+        //Chainlink init
+        vrfCoordinator = 0xc587d9053cd1118f25F645F9E08BB98c9712A4EE;
+        COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
+        keyHash = 0x114f3da0a805b6a67d6e9cd2ec746f7028f1b7376365af575cfea3550dd1aa04;
+        s_subscriptionId = 273;
+        callbackGasLimit = 400000;
+        requestConfirmations = 3;
+
+        //Lottery init
+        lotterywallet = 0xaeE863d491758e352349820e65eDAbC9df417f1E;
+        ticketsToDraw = 5;
+        LotteryWinningChance = 50;
+        LotteryThreshold = 10000000000000000000; //10b Token  
+        communityTickets = 1;
+        communityTicketsWinningChance = 50;
+        burnPercentage = 300;
+        pendingLotteryTickets = 0;
+        requestedRandomNumbers = 0;
+    }
+    
 }
 
-library StackingStruct {
+library HODLStruct {
     struct stacking {
         bool enabled;
         uint64 cycle;
@@ -2642,5 +2909,18 @@ library StackingStruct {
         uint96 amount;
         uint96 hardcap;   
     }
-}
+ 
+    struct LotteryTicket {
+        address Wallet;
+        uint16 Number;
+        bool Won;  
+        uint256 PossibleWinAmount;
+        uint256 TimeStamp; 
+    }
 
+    struct LastLotteryWin {
+        address Winner;
+        uint256 Amount;
+        uint256 TimeStamp;
+    }
+}
