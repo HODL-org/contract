@@ -1,7 +1,3 @@
-/**
- *Submitted for verification at BscScan.com on 2022-07-06
-*/
-
 // SPDX-License-Identifier: Unlicensed
 //
 //   __    __     ______     _____       __
@@ -13,7 +9,7 @@
 //
 //
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.16;
 
 interface VRFCoordinatorV2Interface {
   /**
@@ -138,7 +134,7 @@ interface VRFCoordinatorV2Interface {
   function pendingRequestExists(uint64 subId) external view returns (bool);
 }
 
-pragma solidity ^0.8.4;
+pragma solidity 0.8.16;
 
 /** ****************************************************************************
  * @notice Interface for contracts using VRF randomness
@@ -272,7 +268,7 @@ abstract contract VRFConsumerBaseV2 {
 }
 
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.16;
 
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP.
@@ -382,7 +378,7 @@ interface IWBNB {
     ) external returns (bool);
 }
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.16;
 
 // CAUTION
 // This version of SafeMath should only be used with Solidity 0.8 or later,
@@ -611,14 +607,15 @@ abstract contract Context {
     function _msgSender() internal view virtual returns (address) {
         return msg.sender;
     }
-
+    /*
     function _msgData() internal view virtual returns (bytes memory) {
         this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
         return msg.data;
     }
+    */
 }
 
-pragma solidity ^0.8.1;
+pragma solidity 0.8.16;
 
 /**
  * @dev Collection of functions related to the address type
@@ -674,12 +671,14 @@ library Address {
      * {ReentrancyGuard} or the
      * https://solidity.readthedocs.io/en/v0.5.11/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].
      */
+     /*
     function sendValue(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Address: insufficient balance");
 
         (bool success, ) = recipient.call{value: amount}("");
         require(success, "Address: unable to send value, recipient may have reverted");
     }
+    */
 
     /**
      * @dev Performs a Solidity function call using a low level `call`. A
@@ -699,16 +698,18 @@ library Address {
      *
      * _Available since v3.1._
      */
+     /*
     function functionCall(address target, bytes memory data) internal returns (bytes memory) {
         return functionCallWithValue(target, data, 0, "Address: low-level call failed");
     }
-
+*/
     /**
      * @dev Same as {xref-Address-functionCall-address-bytes-}[`functionCall`], but with
      * `errorMessage` as a fallback revert reason when `target` reverts.
      *
      * _Available since v3.1._
      */
+     /*
     function functionCall(
         address target,
         bytes memory data,
@@ -716,7 +717,7 @@ library Address {
     ) internal returns (bytes memory) {
         return functionCallWithValue(target, data, 0, errorMessage);
     }
-
+    */
     /**
      * @dev Same as {xref-Address-functionCall-address-bytes-}[`functionCall`],
      * but also transferring `value` wei to `target`.
@@ -728,6 +729,7 @@ library Address {
      *
      * _Available since v3.1._
      */
+     /*
     function functionCallWithValue(
         address target,
         bytes memory data,
@@ -735,13 +737,14 @@ library Address {
     ) internal returns (bytes memory) {
         return functionCallWithValue(target, data, value, "Address: low-level call with value failed");
     }
-
+    */
     /**
      * @dev Same as {xref-Address-functionCallWithValue-address-bytes-uint256-}[`functionCallWithValue`], but
      * with `errorMessage` as a fallback revert reason when `target` reverts.
      *
      * _Available since v3.1._
      */
+     /*
     function functionCallWithValue(
         address target,
         bytes memory data,
@@ -752,23 +755,25 @@ library Address {
         (bool success, bytes memory returndata) = target.call{value: value}(data);
         return verifyCallResultFromTarget(target, success, returndata, errorMessage);
     }
-
+    */
     /**
      * @dev Same as {xref-Address-functionCall-address-bytes-}[`functionCall`],
      * but performing a static call.
      *
      * _Available since v3.3._
      */
+     /*
     function functionStaticCall(address target, bytes memory data) internal view returns (bytes memory) {
         return functionStaticCall(target, data, "Address: low-level static call failed");
     }
-
+    */
     /**
      * @dev Same as {xref-Address-functionCall-address-bytes-string-}[`functionCall`],
      * but performing a static call.
      *
      * _Available since v3.3._
      */
+     /*
     function functionStaticCall(
         address target,
         bytes memory data,
@@ -777,23 +782,25 @@ library Address {
         (bool success, bytes memory returndata) = target.staticcall(data);
         return verifyCallResultFromTarget(target, success, returndata, errorMessage);
     }
-
+    */
     /**
      * @dev Same as {xref-Address-functionCall-address-bytes-}[`functionCall`],
      * but performing a delegate call.
      *
      * _Available since v3.4._
      */
+     /*
     function functionDelegateCall(address target, bytes memory data) internal returns (bytes memory) {
         return functionDelegateCall(target, data, "Address: low-level delegate call failed");
     }
-
+    */
     /**
      * @dev Same as {xref-Address-functionCall-address-bytes-string-}[`functionCall`],
      * but performing a delegate call.
      *
      * _Available since v3.4._
      */
+     /*
     function functionDelegateCall(
         address target,
         bytes memory data,
@@ -802,13 +809,14 @@ library Address {
         (bool success, bytes memory returndata) = target.delegatecall(data);
         return verifyCallResultFromTarget(target, success, returndata, errorMessage);
     }
-
+    */
     /**
      * @dev Tool to verify that a low level call to smart-contract was successful, and revert (either by bubbling
      * the revert reason or using the provided one) in case of unsuccessful call or if target was not a contract.
      *
      * _Available since v4.8._
      */
+     /*
     function verifyCallResultFromTarget(
         address target,
         bool success,
@@ -826,13 +834,14 @@ library Address {
             _revert(returndata, errorMessage);
         }
     }
-
+    /*
     /**
      * @dev Tool to verify that a low level call was successful, and revert if it wasn't, either by bubbling the
      * revert reason or using the provided one.
      *
      * _Available since v4.3._
      */
+     /*
     function verifyCallResult(
         bool success,
         bytes memory returndata,
@@ -844,7 +853,7 @@ library Address {
             _revert(returndata, errorMessage);
         }
     }
-
+    
     function _revert(bytes memory returndata, string memory errorMessage) private pure {
         // Look for revert reason and bubble it up if present
         if (returndata.length > 0) {
@@ -858,6 +867,7 @@ library Address {
             revert(errorMessage);
         }
     }
+    */
 }
 
 /**
@@ -1266,13 +1276,13 @@ interface IPancakeRouter01 {
         address to,
         uint256 deadline
     ) external payable returns (uint256[] memory amounts);
-
+    /*
     function quote(
         uint256 amountA,
         uint256 reserveA,
         uint256 reserveB
     ) external pure returns (uint256 amountETH);
-
+    */
     function getAmountOut(
         uint256 amountIn,
         uint256 reserveIn,
@@ -1345,7 +1355,7 @@ interface IPancakeRouter02 is IPancakeRouter01 {
 
 // File: contracts/protocols/bep/Utils.sol
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.16;
 
 library Utils {
     using SafeMath for uint256;
@@ -1714,7 +1724,7 @@ library PancakeLibrary {
 
 // File: contracts/protocols/bep/ReentrancyGuard.sol
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.16;
 
 /**
  * @dev Contract module that helps prevent reentrant calls to a function.
@@ -1782,7 +1792,7 @@ abstract contract ReentrancyGuard {
 
 // File: contracts/protocols/HODL.sol
 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.16;
 pragma experimental ABIEncoderV2;
 
 contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
@@ -1856,8 +1866,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         _inSwapAndLiquify = false;
     }
 
-    constructor() VRFConsumerBaseV2(0xc587d9053cd1118f25F645F9E08BB98c9712A4EE){
-        COORDINATOR = VRFCoordinatorV2Interface(0xc587d9053cd1118f25F645F9E08BB98c9712A4EE);
+    constructor() VRFConsumerBaseV2(vrfCoordinator){
+        COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
     }
 
     mapping(address => bool) isBlacklisted;
@@ -2020,7 +2030,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         _tFeeTotal = _tFeeTotal.add(tFee);
     }
 
-    function _getRate() private view returns (uint256) {
+    function _getRate() public view returns (uint256) {
         (uint256 rSupply, uint256 tSupply) = _getCurrentSupply();
         return rSupply.div(tSupply);
     }
@@ -2136,6 +2146,13 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
                 TicketNumbers[to].push(LotteryTickets.length-1);
                 pendingLotteryTickets++;
                 totalLotteryTickets++;
+                if  (totalLotteryTickets % AddCommunityTicket == 0)
+                {
+                    LotteryTickets.push(HODLStruct.LotteryTicket(address(this),0,false,balanceOf(lotterywallet),block.timestamp));
+                    TicketNumbers[address(this)].push(LotteryTickets.length-1);
+                    pendingLotteryTickets++;
+                    totalLotteryTickets++;
+                }
                 if ((pendingLotteryTickets-requestedRandomNumbers) >= ticketsToDraw) {
                     requestRandomWords(ticketsToDraw);
                     requestedRandomNumbers += ticketsToDraw;
@@ -2214,7 +2231,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     uint256 public LotteryWinningChance;
     uint256 public pendingLotteryTickets;
     uint256 public ticketsToDraw;
-    uint256 public communityTickets;
+    uint256 public AddCommunityTicket;
     uint256 public communityTicketsWinningChance;
     uint256 public burnPercentage;
     uint256 public requestedRandomNumbers;
@@ -2323,7 +2340,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         require(balanceOf(msg.sender) > 0, "Error: no Hodl");
 
         uint256 totalsupply = uint256(_tTotal)
-            .sub(balanceOf(0x000000000000000000000000000000000000dEaD)) // exclude burned wallet
+            .sub(balanceOf(deadAddress)) // exclude burned wallet
             .sub(balanceOf(address(pancakePair))); // exclude liquidity wallet
         uint256 currentBNBPool = address(this).balance;
 
@@ -2364,7 +2381,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
                 _rOwned[msg.sender] += rAmount;
                 _rOwned[address(this)] -= rAmount;
             }
-            emit Transfer(stackingWallet, msg.sender, expectedtoken);
+            emit Transfer(address(this), msg.sender, expectedtoken);
 
         }
 
@@ -2384,6 +2401,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         emit ClaimBNBSuccessfully(msg.sender,reward,nextAvailableClaimDate[msg.sender]);
     }
 
+    /* @dev Top up next claim date of sender and recipient. 
+    */
     function topUpClaimCycleAfterTransfer(address _sender, address _recipient, uint256 amount) private {
         //_recipient
         uint256 currentBalance = balanceOf(_recipient);
@@ -2418,6 +2437,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         }
     }
 
+    /* @dev Function to ensure that in the last 24h not more tokens selled 
+    *   than defined in _maxTxAmount
+    */
     function ensureMaxTxAmount(address from, address to, uint256 amount) private {
         if (
             _isExcludedFromMaxTx[from] == false && // default will be false
@@ -2465,11 +2487,17 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
             }
     }
 
+    /* @dev Same as swapAndLiquify but manually called by the owner
+    *   or the triggerWallet.
+    */
     function triggerSwapAndLiquify() external lockTheSwap {
         require(((_msgSender() == address(triggerwallet)) || (_msgSender() == owner())) && swapAndLiquifyEnabled, "Error");
         doSwapAndLiquify(address(this).balance);
     }
 
+    /* @dev Function to swap Tokens from the contract to BNB.
+    *   Used to fill the pools. Triggered by any sell or manually by the owner.
+    */
     function doSwapAndLiquify(uint256 initialBalance) private {
 
         Utils.swapTokensForEth(address(pancakeRouter), minTokenNumberToSell);       
@@ -2494,14 +2522,20 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         }    
     }
 
+    /* @dev Send any amount of HODL from the contract to a new address.
+    */
     function migrateToken(address _newadress, uint256 _amount) external onlyOwner{
         _tokenTransfer(address(this), _newadress, _amount, false);
     }
 
+    /* @dev Send any amount of WBNB from the contract to a new address.
+    */
     function migrateWBnb(address _newadress, uint256 _amount) external onlyOwner {
         IWBNB(payable(address(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c))).transfer(_newadress,_amount);
     }
 
+    /* @dev Send any amount of BNB from the contract to a new address.
+    */
     function migrateBnb(address payable _newadd, uint256 amount) external onlyOwner{
         require(_newadd != address(0), "Error");
         (bool success, ) = address(_newadd).call{value: amount}("");
@@ -2513,15 +2547,15 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     */
     function changeAnyValue(uint8 _var, uint256 _value) external onlyOwner {
         if (_var == 1) {
-            require(_value <= 110, "Error");
+            require(_value <= 110, "Err");
             selltax = _value;
             emit changeValue("sell tax", _value);  
         } else if (_var == 2) {
-            require(_value <= 110, "Error");
+            require(_value <= 110, "Err");
             buytax = _value;
             emit changeValue("buy tax", _value);
         } else if (_var == 3) {
-            require(_value <= 110, "Error");
+            require(_value <= 110, "Err");
             transfertax = _value;
             emit changeValue("transfer tax", _value);
         } else if (_var == 4) {
@@ -2529,50 +2563,57 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
             minTokenNumberToSell = _value;
             emit changeValue("MinTokenNumberToSell", _value);
         } else if (_var == 5) {
-            require(_value >= minTokenNumberToSell, "Error");
+            require(_value >= minTokenNumberToSell, "Err");
             minTokenNumberUpperlimit = _value;
             emit changeValue("MinTokenNumberUpperLimit", _value);
         } else if (_var == 6) {
-            require(_value >= 1e18, "Error");
+            require(_value >= 1e18, "Err");
             rewardHardcap = _value;
             emit changeValue("RewardHardcap", _value);
         } else if (_var == 7) {
-            require(_value <= 1e16, "Error"); //0.01bnb
+            require(_value <= 1e16, "Err"); //0.01bnb
             claimBNBLimit = _value;
             emit changeValue("ClaimBNBLimit", _value);
         } else if (_var == 8) {
-            require(_value <= 1e16, "Error"); //0.01bnb
+            require(_value <= 1e16, "Err"); //0.01bnb
             reinvestLimit = _value;
             emit changeValue("ReinvestLimit", _value);
         } else if (_var == 9) {
-            require(_value >= 1e16, "Error"); //min 0.01bnb
+            require(_value >= 1e16, "Err"); //min 0.01bnb
             bnbStackingLimit = _value;
             emit changeValue("BNBstackingLimit", _value);
         } else if (_var == 10) {
             LotteryThreshold = _value;
             emit changeValue("LotteryThreshold", _value);
         } else if (_var == 11) {
-            require(_value > 0, "Error");
+            require(_value > 0, "Err");
             LotteryWinningChance = _value;
             emit changeValue("LotteryWinningChance", _value);
         } else if (_var == 12) {
-            require(_value > 0, "Error");
+            require(_value > 0, "Err");
             communityTicketsWinningChance = _value;
             emit changeValue("CommunityWinningChance", _value);
         } else if (_var == 13) {
-            require(_value > 0, "Error");
+            require(_value > 0, "Err");
             ticketsToDraw = _value;
         } else if (_var == 14) {
             threshHoldTopUpRate = _value;
             emit changeValue("ThreshHoldTopUpRate", _value);
         } else if (_var == 15) {
-            require(_value >= 86400, "Error"); //min 1 day
+            require(_value >= 86400, "Err"); //min 1 day
             rewardCycleBlock = _value;
         } else if (_var == 16) {
             require(_value <= 100 && _value > 0, "Error");
             _maxTxAmount = _tTotal.mul(_value).div(100000);
             emit changeValue("maxTxAmount", _value);
-        }       
+        } else if (_var == 17) {
+            require(_value >= 100000, "Err");
+            callbackGasLimit = _value;
+            emit changeValue("callbackGasLimit", _value);
+        } else if (_var == 18) {
+            AddCommunityTicket = _value;
+            emit changeValue("AddCommunityTicket", _value);
+        }
     }
 
     /* @dev Function to change any address variable. 
@@ -2629,10 +2670,18 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
                       (taxes.lottery);
     }
     
+    /*  @dev Enable/Disable if address is a HODL Pair address
+    */
     function updatePairAddress(address _pairAddress, bool _enable) external onlyOwner {
         pairAddresses[_pairAddress] = _enable;
     }
     
+    /*  @dev Function to start rward stacking. the whole tokens (minus 1) are sent to the
+    *   stacking wallet. While stacking is enabled the bnb reward is accumulated.
+    *   Once the user stops stacking the amount it sent back plus the accumulated reward.
+    *
+    *       "HODL Bears to ride Bulls" - Adam Roberts
+    */
     function startStacking() external {
         
         uint96 balance = uint96(balanceOf(msg.sender)-1E9);
@@ -2667,6 +2716,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         emit StartStacking(msg.sender, balance);
     }
     
+    /*  @dev Calculate the amount of stacked reward
+    */
     function getStacked(address _address) public view returns (uint256) {
         HODLStruct.stacking memory tmpStack =  rewardStacking[_address];
         if (tmpStack.enabled) {
@@ -2726,7 +2777,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
                 _rOwned[msg.sender] += rExpected;
                 _rOwned[address(this)] -= rExpected;
             }
-            emit Transfer(stackingWallet, msg.sender, expectedtoken);
+            emit Transfer(address(this), msg.sender, expectedtoken);
 
         }
 
@@ -2783,51 +2834,50 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
         uint256 startTicket = totalLotteryTickets-pendingLotteryTickets;
         uint256 currentRate = _getRate();
-        uint16 i;
-        uint16 number;
         uint256 tLotteryAmount;
         uint256 rLotteryAmount;
-        uint16 toEvaluate = (uint16)(drawnNumbers.length-communityTickets);
+        uint16 i;
+        uint16 number;
+        bool won;
+        bool community;
+        uint16 toEvalute = (uint16)(drawnNumbers.length);
 
-        for(i = 0; i < toEvaluate; i++)
+        for(i = 0; i < toEvalute; i++)
         {
             number = (uint16)(drawnNumbers[i] % 1000) + 1;
-            LotteryTickets[startTicket+i].Number = number;
-            if (number <= LotteryWinningChance) {
-                LotteryTickets[startTicket+i].Won = true;
+            HODLStruct.LotteryTicket storage tmpTicket = LotteryTickets[startTicket+i];
+            tmpTicket.Number = number;
+
+            community = (tmpTicket.Wallet == address(this)) && (number <= communityTicketsWinningChance);    
+            won = community || ((tmpTicket.Wallet != address(this)) && (number <= LotteryWinningChance));
+            
+            if (won) {
+                tmpTicket.Won = true;
                 tLotteryAmount = _rOwned[lotterywallet] / currentRate;
-                if (tLotteryAmount > LotteryTickets[startTicket+i].PossibleWinAmount) tLotteryAmount = LotteryTickets[startTicket+i].PossibleWinAmount;
-                
+                if (tLotteryAmount > tmpTicket.PossibleWinAmount) tLotteryAmount = tmpTicket.PossibleWinAmount;
                 //Burn tokens
                 tLotteryAmount = burnTokens(tLotteryAmount, currentRate);
                 rLotteryAmount = tLotteryAmount * currentRate;
-                address winner = LotteryTickets[startTicket+i].Wallet;
+                address winner = tmpTicket.Wallet;
 
-                //Payout lotterywin
-                _rOwned[winner] += rLotteryAmount;
+                if (community) {
+                    //Reflect tokens
+                    _reflectFee(rLotteryAmount, tLotteryAmount);
+                    emit CommunityWin(tLotteryAmount);
+                } else {
+                    //Payout lotterywin
+                    _rOwned[winner] += rLotteryAmount;
+                    emit Transfer(lotterywallet, winner, tLotteryAmount);
+                    emit LotteryWin(winner, tLotteryAmount);
+                }
                 _rOwned[lotterywallet] -= rLotteryAmount;
-                emit Transfer(lotterywallet, winner, tLotteryAmount);
-
-                //Set last winner and emit event
+                //Set last winner
                 lastLotteryWinner = HODLStruct.LastLotteryWin(winner, tLotteryAmount, block.timestamp);
-                emit LotteryWin(winner, tLotteryAmount);
             }
+            
         }
-        pendingLotteryTickets -= toEvaluate;
-        requestedRandomNumbers -= toEvaluate;
-
-        //CommunityTickets
-        for(i = toEvaluate; i < drawnNumbers.length; i++)
-        { 
-            number = (uint16)(drawnNumbers[i] % 1000) + 1;
-            if (number <= communityTicketsWinningChance) {       
-                tLotteryAmount = burnTokens(balanceOf(lotterywallet), currentRate);
-                rLotteryAmount = tLotteryAmount * currentRate;
-                _rOwned[lotterywallet] = 0;
-                _reflectFee(rLotteryAmount, tLotteryAmount);
-                emit CommunityWin(tLotteryAmount);
-            }
-        }
+        pendingLotteryTickets -= toEvalute;
+        requestedRandomNumbers -= toEvalute;
     }
 
     /* @dev Function to burn a specific amount of tokens
@@ -2864,7 +2914,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         (uint16)(s_subscriptionId),
         (uint16)(requestConfirmations),
         (uint32)(callbackGasLimit),
-        (uint32)(amount+communityTickets)
+        (uint32)(amount)
         );
     }
 
@@ -2873,29 +2923,6 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     */
     function evaluatePendingLottery(uint32 _amount) external onlyOwner {
         requestRandomWords(_amount);
-    }
-    
-    /* @dev Fnction to initialize chainlink and lottery
-    */
-    function initializeUpgradedContract() external onlyOwner {
-        //Chainlink init
-        vrfCoordinator = 0xc587d9053cd1118f25F645F9E08BB98c9712A4EE;
-        COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
-        keyHash = 0x114f3da0a805b6a67d6e9cd2ec746f7028f1b7376365af575cfea3550dd1aa04;
-        s_subscriptionId = 273;
-        callbackGasLimit = 400000;
-        requestConfirmations = 3;
-
-        //Lottery init
-        lotterywallet = 0xaeE863d491758e352349820e65eDAbC9df417f1E;
-        ticketsToDraw = 5;
-        LotteryWinningChance = 50;
-        LotteryThreshold = 10000000000000000000; //10b Token  
-        communityTickets = 1;
-        communityTicketsWinningChance = 50;
-        burnPercentage = 300;
-        pendingLotteryTickets = 0;
-        requestedRandomNumbers = 0;
     }
     
 }
