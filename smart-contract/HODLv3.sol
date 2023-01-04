@@ -1892,7 +1892,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
                 } 
                 if (_isExcluded[to]) {
                     _tOwned[to] += amount;
-                }  
+                }
+		topUpClaimCycleAfterTransfer(from, to, amount);
+                emit Transfer(from, to, amount);
             } else {
             //indicates if fee should be deducted from transfer
             bool takeFee = !(
