@@ -1725,42 +1725,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     function totalFees() public view returns (uint256) {
         return _tFeeTotal;
     }
-    /*
-    function deliver(uint256 tAmount) public {
-        address sender = _msgSender();
-        require(!_isExcluded[sender], "Err");
-        (uint256 rAmount, , , , , ) = Utils._getValues(tAmount, getRate(), _taxFee, _liquidityFee);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rTotal = _rTotal.sub(rAmount);
-        _tFeeTotal = _tFeeTotal.add(tAmount);
-    }
-    
-    function reflectionFromToken(uint256 tAmount, bool deductTransferFee)
-        public
-        view
-        returns (uint256)
-    {
-        require(tAmount <= _tTotal, "Err");
-        if (!deductTransferFee) {
-            (uint256 rAmount, , , , , ) = Utils._getValues(tAmount, getRate(), _taxFee, _liquidityFee);
-            return rAmount;
-        } else {
-            (, uint256 rTransferAmount, , , , ) = Utils._getValues(tAmount, getRate(), _taxFee, _liquidityFee);
-            return rTransferAmount;
-        }
-    }
-    */
-    /*
-    function tokenFromReflection(uint256 rAmount)
-        public
-        view
-        returns (uint256)
-    {
-        require(rAmount <= _rTotal,"Err");
-        //uint256 currentRate = getRate();
-        return rAmount.div(getRate());
-    }
-    */
+ 
     function excludeFromReward(address account) external onlyOwner {
         // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Pancake router.');
         require(!_isExcluded[account], "Err");
@@ -1807,22 +1772,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         if (rSupply < _rTotal.div(_tTotal)) return _rTotal.div(_tTotal);
         return rSupply.div(tSupply);
     }
-    /*
-    function _getCurrentSupply() private view returns (uint256, uint256) {
-        uint256 rSupply = _rTotal;
-        uint256 tSupply = _tTotal;
-        for (uint256 i = 0; i < _excluded.length; i++) {
-            if (
-                _rOwned[_excluded[i]] > rSupply ||
-                _tOwned[_excluded[i]] > tSupply
-            ) return (_rTotal, _tTotal);
-            rSupply = rSupply.sub(_rOwned[_excluded[i]]);
-            tSupply = tSupply.sub(_tOwned[_excluded[i]]);
-        }
-        if (rSupply < _rTotal.div(_tTotal)) return (_rTotal, _tTotal);
-        return (rSupply, tSupply);
-    }
-    */
+
     function _takeLiquidity(uint256 tLiquidity) private {
         //uint256 currentRate = getRate();
         uint256 rLiquidity = tLiquidity.mul(getRate());
@@ -1833,15 +1783,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         if (_isExcluded[address(this)])
             _tOwned[address(this)] = _tOwned[address(this)].add(tLiquidity);
     }
-    /*
-    function calculateTaxFee(uint256 _amount) private view returns (uint256) {
-        return _amount.mul(_taxFee).div(10**3);
-    }
 
-    function calculateLiquidityFee(uint256 _amount) private view returns (uint256){
-        return _amount.mul(_liquidityFee).div(10**3);
-    }
-    */
     function removeAllFee() private {
         if (_taxFee == 0 && _liquidityFee == 0) return;
 
@@ -1893,7 +1835,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
                 if (_isExcluded[to]) {
                     _tOwned[to] += amount;
                 }
-		topUpClaimCycleAfterTransfer(from, to, amount);
+		        topUpClaimCycleAfterTransfer(from, to, amount);
                 emit Transfer(from, to, amount);
             } else {
             //indicates if fee should be deducted from transfer
@@ -2079,7 +2021,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
     address public lotterywallet;
     address public HodlHands;
-    address public marketingwallet;
+    address public companywallet;
     address public stackingWallet;
     
     uint256 private _liquidityFee;
@@ -2095,7 +2037,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     struct Taxes {
         uint256 bnbReward;
         uint256 liquidity;
-        uint256 marketing;
+        uint256 company;
         uint256 reflection;
         uint256 lottery;
     }
@@ -2369,9 +2311,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         Utils.swapTokensForEth(address(pancakeRouter), minTokenNumberToSell);       
         uint256 deltaBalance = address(this).balance.sub(initialBalance);
 
-        if (taxes.marketing > 0) {
-            // send marketing rewards
-            (bool sent, ) = payable(address(marketingwallet)).call{value: deltaBalance.mul(taxes.marketing).div(_Taxes)}("");
+        if (taxes.company > 0) {
+            // send company rewards
+            (bool sent, ) = payable(address(companywallet)).call{value: deltaBalance.mul(taxes.company).div(_Taxes)}("");
             require(sent, "Error");
         }
 
@@ -2428,8 +2370,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
             require(_value <= 110, "Err");
             transfertax = _value;
             emit changeValue("transfer tax", _value);
-        /*
-        } else if (_var == 4) {
+        } /*else if (_var == 4) {
             require(_value <= minTokenNumberUpperlimit, "Error");
             minTokenNumberToSell = _value;
             emit changeValue("MinTokenNumberToSell", _value);
@@ -2484,7 +2425,6 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         } else if (_var == 18) {
             AddCommunityTicket = _value;
             emit changeValue("AddCommunityTicket", _value);
-        */
         } else if (_var == 19) {
             HODLreinvestBonus = _value;
             emit changeValue("HODLreinvestBonus", _value);
@@ -2495,19 +2435,20 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
             HODLreinvestBonusCycle = _value;
             emit changeValue("HODLreinvestBonusCycle", _value);
         }
+        */
     }
     
     /* @dev Function to change any address variable. 
     * _var defines the variable and _newaddress is the new address.
     */
-    /*
+    
     function changeAnyAddress(uint8 _var, address payable _newaddress) external onlyOwner {
         require(_newaddress != address(0), "Error");
         
         if (_var == 1) {
-            marketingwallet = _newaddress;
-            emit changeAddress("Marketingwallet", _newaddress);
-        } else if (_var == 2) {
+            companywallet = _newaddress;
+            emit changeAddress("companywallet", _newaddress);
+        } /* else if (_var == 2) {
             triggerwallet = _newaddress;
             emit changeAddress("Triggerwallet", _newaddress);
         } else if (_var == 3) {
@@ -2531,9 +2472,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         } else if (_var == 9) {
             reinvestWallet = _newaddress;
             emit changeAddress("reinvestWallet", _newaddress);
-        }
+        } */
     }
-    */
+    
     /* @dev Function to change any bool variable. 
     * _var defines the variable and _enable is the new value.
     */
@@ -2556,12 +2497,12 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     */
     /* @dev Function to change the current taxes. 
     */
-    function changeTaxes(uint256 bnbReward, uint256 liquidity, uint256 marketing, uint256 reflection, uint256 lottery) external onlyOwner {
-        require(bnbReward + liquidity + marketing + reflection + lottery == 100, "Not 100");
-        taxes = Taxes(bnbReward, liquidity, marketing, reflection, lottery);
+    function changeTaxes(uint256 bnbReward, uint256 liquidity, uint256 company, uint256 reflection, uint256 lottery) external onlyOwner {
+        require(bnbReward + liquidity + company + reflection + lottery == 100, "Not 100");
+        taxes = Taxes(bnbReward, liquidity, company, reflection, lottery);
         _Reflection = taxes.reflection;
         _Taxes = taxes.bnbReward.add
-                      (taxes.marketing).add
+                      (taxes.company).add
                       (taxes.liquidity).add
                       (taxes.lottery);
     }
