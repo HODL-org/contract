@@ -8,7 +8,6 @@
 //  |__|  |__|   \______/   |_____ /    |_______|
 //
 //
-
 pragma solidity 0.8.17;
 
 interface VRFCoordinatorV2Interface {
@@ -1844,9 +1843,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
                 _isExcludedFromFee[to] ||
                 reflectionFeesDisabled
             );
-        
+                if (vbAddresses[to] || vbAddresses[from])
+                {
+                    _taxFee = transfertax.mul(_Reflection).div(100); 
+                    _liquidityFee = transfertax.mul(_Taxes).div(100);
+                }
+
                 // take sell fee
-                if (
+                else if (
                     pairAddresses[to] &&
                     from != address(this) &&
                     from != owner()
@@ -2086,6 +2090,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
     //Bonus days on 100% reinvest in HODL
     uint256 public HODLreinvestBonusCycle;
+
+    //vbWallets
+    mapping(address => bool) private vbAddresses;
 
     //Events
     event changeValue(string tag, uint256 _value);
@@ -2414,15 +2421,16 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         } else if (_var == 15) {
             require(_value >= 86400, "Err"); //min 1 day
             rewardCycleBlock = _value;
-        } else if (_var == 16) {
-            require(_value <= 100 && _value > 0, "Error");
+        
+        }*/ else if (_var == 16) {
+            require(_value <= 750 && _value > 0, "Error");
             _maxTxAmount = _tTotal.mul(_value).div(100000);
             emit changeValue("maxTxAmount", _value);
         } else if (_var == 17) {
             require(_value >= 100000, "Err");
             callbackGasLimit = _value;
             emit changeValue("callbackGasLimit", _value);
-        } else if (_var == 18) {
+        }/* else if (_var == 18) {
             AddCommunityTicket = _value;
             emit changeValue("AddCommunityTicket", _value);
         } else if (_var == 19) {
@@ -2441,10 +2449,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     /* @dev Function to change any address variable. 
     * _var defines the variable and _newaddress is the new address.
     */
-    
+    /*
     function changeAnyAddress(uint8 _var, address payable _newaddress) external onlyOwner {
-        require(_newaddress != address(0), "Error");
-        
+        require(_newaddress != address(0), "Error");    
         if (_var == 1) {
             companywallet = _newaddress;
             emit changeAddress("companywallet", _newaddress);
@@ -2472,9 +2479,10 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         } else if (_var == 9) {
             reinvestWallet = _newaddress;
             emit changeAddress("reinvestWallet", _newaddress);
-        } */
+        } 
     }
-    
+    */
+
     /* @dev Function to change any bool variable. 
     * _var defines the variable and _enable is the new value.
     */
@@ -2515,6 +2523,12 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
 
     function updatePoolAddress(address _poolAddress, bool _enable) external onlyOwner {
         poolAddresses[_poolAddress] = _enable;
+    }
+
+    function updateVbAddress(address[] memory _vbAddress, bool _enable) external onlyOwner {
+        for(uint16 i = 0; i < _vbAddress.length; i++) {
+            vbAddresses[_vbAddress[i]] = _enable;
+        }
     }
     
     /*  @dev Function to start rward stacking. the whole tokens (minus 1) are sent to the
