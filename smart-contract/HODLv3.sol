@@ -8,7 +8,7 @@
 //  |__|  |__|   \______/   |_____ /    |_______|
 //
 //
-pragma solidity 0.8.17;
+pragma solidity 0.8.19;
 
 interface VRFCoordinatorV2Interface {
   /**
@@ -132,8 +132,6 @@ interface VRFCoordinatorV2Interface {
    */
   function pendingRequestExists(uint64 subId) external view returns (bool);
 }
-
-pragma solidity 0.8.17;
 
 /** ****************************************************************************
  * @notice Interface for contracts using VRF randomness
@@ -266,9 +264,6 @@ abstract contract VRFConsumerBaseV2 {
   }
 }
 
-
-pragma solidity 0.8.17;
-
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP.
  */
@@ -376,12 +371,6 @@ interface IWBNB {
         uint256 wad
     ) external returns (bool);
 }
-
-pragma solidity 0.8.17;
-
-// CAUTION
-// This version of SafeMath should only be used with Solidity 0.8 or later,
-// because it relies on the compiler's built in overflow checks.
 
 /**
  * @dev Wrappers over Solidity's arithmetic operations.
@@ -1092,9 +1081,6 @@ interface IPancakeRouter02 is IPancakeRouter01 {
 }
 
 // File: contracts/protocols/bep/Utils.sol
-
-pragma solidity 0.8.17;
-
 library Utils {
     using SafeMath for uint256;
    
@@ -1482,10 +1468,6 @@ library PancakeLibrary {
 
 }
 
-// File: contracts/protocols/bep/ReentrancyGuard.sol
-
-pragma solidity 0.8.17;
-
 /**
  * @dev Contract module that helps prevent reentrant calls to a function.
  *
@@ -1550,9 +1532,6 @@ abstract contract ReentrancyGuard {
     }
 }
 
-// File: contracts/protocols/HODL.sol
-
-pragma solidity 0.8.17;
 pragma experimental ABIEncoderV2;
 
 contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
@@ -1671,49 +1650,27 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         return true;
     }
 
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public override returns (bool) {
-        _transfer(sender, recipient, amount);
-        _approve(
-            sender,
-            _msgSender(),
-            _allowances[sender][_msgSender()].sub(
-                amount,
-                "Err"
-            )
-        );
+    function transferFrom(address from, address to, uint256 amount) public virtual override returns (bool) {
+        address spender = _msgSender();
+        _spendAllowance(from, spender, amount);
+        _transfer(from, to, amount);
         return true;
     }
 
-    function increaseAllowance(address spender, uint256 addedValue)
-        public
-        virtual
-        returns (bool)
-    {
-        _approve(
-            _msgSender(),
-            spender,
-            _allowances[_msgSender()][spender].add(addedValue)
-        );
+    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        _approve(owner, spender, allowance(owner, spender) + addedValue);
         return true;
     }
 
-    function decreaseAllowance(address spender, uint256 subtractedValue)
-        public
-        virtual
-        returns (bool)
-    {
-        _approve(
-            _msgSender(),
-            spender,
-            _allowances[_msgSender()][spender].sub(
-                subtractedValue,
-                "Err"
-            )
-        );
+    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+        address owner = _msgSender();
+        uint256 currentAllowance = allowance(owner, spender);
+        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        unchecked {
+            _approve(owner, spender, currentAllowance - subtractedValue);
+        }
+
         return true;
     }
 
@@ -1729,7 +1686,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Pancake router.');
         require(!_isExcluded[account], "Err");
         if (_rOwned[account] > 0) {
-            _tOwned[account] = _rOwned[account].div(getRate());//tokenFromReflection(_rOwned[account]);
+            _tOwned[account] = _rOwned[account].div(getRate());
         }
         _isExcluded[account] = true;
         _excluded.push(account);
@@ -1810,6 +1767,24 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         require(owner != address(0) && spender != address(0), "Err");
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
+    }
+
+    /**
+     * @dev Updates `owner` s allowance for `spender` based on spent `amount`.
+     *
+     * Does not update the allowance amount in case of infinite allowance.
+     * Revert if not enough allowance is available.
+     *
+     * Might emit an {Approval} event.
+     */
+    function _spendAllowance(address owner, address spender, uint256 amount) internal virtual {
+        uint256 currentAllowance = allowance(owner, spender);
+        if (currentAllowance != type(uint256).max) {
+            require(currentAllowance >= amount, "ERC20: insufficient allowance");
+            unchecked {
+                _approve(owner, spender, currentAllowance - amount);
+            }
+        }
     }
 
     function _transfer(
