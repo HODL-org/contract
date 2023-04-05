@@ -1682,7 +1682,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         return _tFeeTotal;
     }
     
-    /*
+    
     function excludeFromReflections(address account) external onlyOwner {
         // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Pancake router.');
         require(!_isExcluded[account], "Err");
@@ -1698,19 +1698,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         for (uint256 i = 0; i < _excluded.length; i++) {
             if (_excluded[i] == account) {
                 _excluded[i] = _excluded[_excluded.length - 1];
-
-                uint256 newrAmount = _tOwned[account]*getRate();
-                rateCorrection += _rOwned[account] - newrAmount;
-                _rOwned[account] = _tOwned[account]*getRate();
                 _tOwned[account] = 0;
-
                 _isExcluded[account] = false;
                 _excluded.pop();
                 break;
             }
         }
     }
-    */
+    
 
     function includeExcludeFromFee(address account, bool _enable) external onlyOwner {
         _isExcludedFromFee[account] = _enable;
