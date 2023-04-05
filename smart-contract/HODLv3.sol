@@ -1681,8 +1681,9 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     function totalFees() public view returns (uint256) {
         return _tFeeTotal;
     }
- 
-    function excludeFromReward(address account) external onlyOwner {
+    
+    /*
+    function excludeFromReflections(address account) external onlyOwner {
         // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Pancake router.');
         require(!_isExcluded[account], "Err");
         if (_rOwned[account] > 0) {
@@ -1692,18 +1693,24 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
         _excluded.push(account);
     }
 
-    function includeInReward(address account) external onlyOwner {
+    function includeInReflections(address account) external onlyOwner {
         require(_isExcluded[account], "Err");
         for (uint256 i = 0; i < _excluded.length; i++) {
             if (_excluded[i] == account) {
                 _excluded[i] = _excluded[_excluded.length - 1];
+
+                uint256 newrAmount = _tOwned[account]*getRate();
+                rateCorrection += _rOwned[account] - newrAmount;
+                _rOwned[account] = _tOwned[account]*getRate();
                 _tOwned[account] = 0;
+
                 _isExcluded[account] = false;
                 _excluded.pop();
                 break;
             }
         }
     }
+    */
 
     function includeExcludeFromFee(address account, bool _enable) external onlyOwner {
         _isExcludedFromFee[account] = _enable;
@@ -1968,7 +1975,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     mapping(address => uint256) public nextAvailableClaimDate;
     bool public swapAndLiquifyEnabled;
     uint256 private HODLXreinvestBonus;
-    uint256 private reserve_6;
+    uint256 private rateCorrection;
 
     bool public reflectionFeesDisabled;
 
@@ -2081,10 +2088,12 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     event LotteryWin(address _wallet, uint256 amount);
     event CommunityWin(uint256 amount);
 
+    /*
     function setExcludeFromMaxTx(address _address, bool value) external onlyOwner{
         _isExcludedFromMaxTx[_address] = value;
     }
-
+    */
+    
     /*
     *   "Rome was not built in a day" - John Heywood
     */
@@ -2398,7 +2407,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
             rewardCycleBlock = _value;
         
         }*/ else if (_var == 16) {
-            require(_value <= 750 && _value > 0, "Error");
+            require(_value <= 750 && _value >= 100, "Error");
             _maxTxAmount = _tTotal.mul(_value).div(100000);
             emit changeValue("maxTxAmount", _value);
         } else if (_var == 17) {
