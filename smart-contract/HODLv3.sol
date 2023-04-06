@@ -8,6 +8,11 @@
 //  |__|  |__|   \______/   |_____ /    |_______|
 //
 //
+// Website: hodltoken.net
+// Telegram: t.me/hodlinvestorgroup
+// Twitter: twitter.com/hodl_official
+//
+//
 pragma solidity 0.8.19;
 
 interface VRFCoordinatorV2Interface {
@@ -1685,6 +1690,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard, VRFConsumerBaseV2 {
     
     function excludeFromReflections(address account) external onlyOwner {
         // require(account != 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 'We can not exclude Pancake router.');
+        require(_excluded.length < 100, "Err");
         require(!_isExcluded[account], "Err");
         if (_rOwned[account] > 0) {
             _tOwned[account] = _rOwned[account].div(getRate());
