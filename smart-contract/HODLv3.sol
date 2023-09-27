@@ -138,137 +138,6 @@ interface VRFCoordinatorV2Interface {
   function pendingRequestExists(uint64 subId) external view returns (bool);
 }
 
-/** ****************************************************************************
- * @notice Interface for contracts using VRF randomness
- * *****************************************************************************
- * @dev PURPOSE
- *
- * @dev Reggie the Random Oracle (not his real job) wants to provide randomness
- * @dev to Vera the verifier in such a way that Vera can be sure he's not
- * @dev making his output up to suit himself. Reggie provides Vera a public key
- * @dev to which he knows the secret key. Each time Vera provides a seed to
- * @dev Reggie, he gives back a value which is computed completely
- * @dev deterministically from the seed and the secret key.
- *
- * @dev Reggie provides a proof by which Vera can verify that the output was
- * @dev correctly computed once Reggie tells it to her, but without that proof,
- * @dev the output is indistinguishable to her from a uniform random sample
- * @dev from the output space.
- *
- * @dev The purpose of this contract is to make it easy for unrelated contracts
- * @dev to talk to Vera the verifier about the work Reggie is doing, to provide
- * @dev simple access to a verifiable source of randomness. It ensures 2 things:
- * @dev 1. The fulfillment came from the VRFCoordinator
- * @dev 2. The consumer contract implements fulfillRandomWords.
- * *****************************************************************************
- * @dev USAGE
- *
- * @dev Calling contracts must inherit from VRFConsumerBase, and can
- * @dev initialize VRFConsumerBase's attributes in their constructor as
- * @dev shown:
- *
- * @dev   contract VRFConsumer {
- * @dev     constructor(<other arguments>, address _vrfCoordinator, address _link)
- * @dev       VRFConsumerBase(_vrfCoordinator) public {
- * @dev         <initialization with other arguments goes here>
- * @dev       }
- * @dev   }
- *
- * @dev The oracle will have given you an ID for the VRF keypair they have
- * @dev committed to (let's call it keyHash). Create subscription, fund it
- * @dev and your consumer contract as a consumer of it (see VRFCoordinatorInterface
- * @dev subscription management functions).
- * @dev Call requestRandomWords(keyHash, subId, minimumRequestConfirmations,
- * @dev callbackGasLimit, ticketsToDraw),
- * @dev see (VRFCoordinatorInterface for a description of the arguments).
- *
- * @dev Once the VRFCoordinator has received and validated the oracle's response
- * @dev to your request, it will call your contract's fulfillRandomWords method.
- *
- * @dev The randomness argument to fulfillRandomWords is a set of random words
- * @dev generated from your requestId and the blockHash of the request.
- *
- * @dev If your contract could have concurrent requests open, you can use the
- * @dev requestId returned from requestRandomWords to track which response is associated
- * @dev with which randomness request.
- * @dev See "SECURITY CONSIDERATIONS" for principles to keep in mind,
- * @dev if your contract could have multiple requests in flight simultaneously.
- *
- * @dev Colliding `requestId`s are cryptographically impossible as long as seeds
- * @dev differ.
- *
- * *****************************************************************************
- * @dev SECURITY CONSIDERATIONS
- *
- * @dev A method with the ability to call your fulfillRandomness method directly
- * @dev could spoof a VRF response with any random value, so it's critical that
- * @dev it cannot be directly called by anything other than this base contract
- * @dev (specifically, by the VRFConsumerBase.rawFulfillRandomness method).
- *
- * @dev For your users to trust that your contract's random behavior is free
- * @dev from malicious interference, it's best if you can write it so that all
- * @dev behaviors implied by a VRF response are executed *during* your
- * @dev fulfillRandomness method. If your contract must store the response (or
- * @dev anything derived from it) and use it later, you must ensure that any
- * @dev user-significant behavior which depends on that stored value cannot be
- * @dev manipulated by a subsequent VRF request.
- *
- * @dev Similarly, both miners and the VRF oracle itself have some influence
- * @dev over the order in which VRF responses appear on the blockchain, so if
- * @dev your contract could have multiple VRF requests in flight simultaneously,
- * @dev you must ensure that the order in which the VRF responses arrive cannot
- * @dev be used to manipulate your contract's user-significant behavior.
- *
- * @dev Since the block hash of the block which contains the requestRandomness
- * @dev call is mixed into the input to the VRF *last*, a sufficiently powerful
- * @dev miner could, in principle, fork the blockchain to evict the block
- * @dev containing the request, forcing the request to be included in a
- * @dev different block with a different hash, and therefore a different input
- * @dev to the VRF. However, such an attack would incur a substantial economic
- * @dev cost. This cost scales with the number of blocks the VRF oracle waits
- * @dev until it calls responds to a request. It is for this reason that
- * @dev that you can signal to an oracle you'd like them to wait longer before
- * @dev responding to the request (however this is not enforced in the contract
- * @dev and so remains effective only in the case of unmodified oracle software).
- */
-abstract contract VRFConsumerBaseV2 {
-  error OnlyCoordinatorCanFulfill(address have, address want);
-  address private immutable vrfCoordinator;
-
-  /**
-   * @param _vrfCoordinator address of VRFCoordinator contract
-   */
-  constructor(address _vrfCoordinator) {
-    vrfCoordinator = _vrfCoordinator;
-  }
-
-  /**
-   * @notice fulfillRandomness handles the VRF response. Your contract must
-   * @notice implement it. See "SECURITY CONSIDERATIONS" above for important
-   * @notice principles to keep in mind when implementing your fulfillRandomness
-   * @notice method.
-   *
-   * @dev VRFConsumerBaseV2 expects its subcontracts to have a method with this
-   * @dev signature, and will call it once it has verified the proof
-   * @dev associated with the randomness. (It is triggered via a call to
-   * @dev rawFulfillRandomness, below.)
-   *
-   * @param requestId The Id initially returned by requestRandomness
-   * @param randomWords the VRF output expanded to the requested number of words
-   */
-  function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal virtual;
-
-  // rawFulfillRandomness is called by VRFCoordinator when it receives a valid VRF
-  // proof. rawFulfillRandomness then calls fulfillRandomness, after validating
-  // the origin of the call
-  function rawFulfillRandomWords(uint256 requestId, uint256[] memory randomWords) external {
-    if (msg.sender != vrfCoordinator) {
-      revert OnlyCoordinatorCanFulfill(msg.sender, vrfCoordinator);
-    }
-    fulfillRandomWords(requestId, randomWords);
-  }
-}
-
 /**
  * @dev Interface of the ERC20 standard as defined in the EIP.
  */
@@ -375,225 +244,6 @@ interface IWBNB {
         address dst,
         uint256 wad
     ) external returns (bool);
-}
-
-/**
- * @dev Wrappers over Solidity's arithmetic operations.
- *
- * NOTE: `SafeMath` is generally not needed starting with Solidity 0.8, since the compiler
- * now has built in overflow checking.
- */
-library SafeMath {
-    /**
-     * @dev Returns the addition of two unsigned integers, with an overflow flag.
-     *
-     * _Available since v3.4._
-     */
-    function tryAdd(uint256 a, uint256 b) internal pure returns (bool, uint256) {
-        unchecked {
-            uint256 c = a + b;
-            if (c < a) return (false, 0);
-            return (true, c);
-        }
-    }
-
-    /**
-     * @dev Returns the subtraction of two unsigned integers, with an overflow flag.
-     *
-     * _Available since v3.4._
-     */
-    function trySub(uint256 a, uint256 b) internal pure returns (bool, uint256) {
-        unchecked {
-            if (b > a) return (false, 0);
-            return (true, a - b);
-        }
-    }
-
-    /**
-     * @dev Returns the multiplication of two unsigned integers, with an overflow flag.
-     *
-     * _Available since v3.4._
-     */
-    function tryMul(uint256 a, uint256 b) internal pure returns (bool, uint256) {
-        unchecked {
-            // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
-            // benefit is lost if 'b' is also tested.
-            // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
-            if (a == 0) return (true, 0);
-            uint256 c = a * b;
-            if (c / a != b) return (false, 0);
-            return (true, c);
-        }
-    }
-
-    /**
-     * @dev Returns the division of two unsigned integers, with a division by zero flag.
-     *
-     * _Available since v3.4._
-     */
-    function tryDiv(uint256 a, uint256 b) internal pure returns (bool, uint256) {
-        unchecked {
-            if (b == 0) return (false, 0);
-            return (true, a / b);
-        }
-    }
-
-    /**
-     * @dev Returns the remainder of dividing two unsigned integers, with a division by zero flag.
-     *
-     * _Available since v3.4._
-     */
-    function tryMod(uint256 a, uint256 b) internal pure returns (bool, uint256) {
-        unchecked {
-            if (b == 0) return (false, 0);
-            return (true, a % b);
-        }
-    }
-
-    /**
-     * @dev Returns the addition of two unsigned integers, reverting on
-     * overflow.
-     *
-     * Counterpart to Solidity's `+` operator.
-     *
-     * Requirements:
-     *
-     * - Addition cannot overflow.
-     */
-    function add(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a + b;
-    }
-
-    /**
-     * @dev Returns the subtraction of two unsigned integers, reverting on
-     * overflow (when the result is negative).
-     *
-     * Counterpart to Solidity's `-` operator.
-     *
-     * Requirements:
-     *
-     * - Subtraction cannot overflow.
-     */
-    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a - b;
-    }
-
-    /**
-     * @dev Returns the multiplication of two unsigned integers, reverting on
-     * overflow.
-     *
-     * Counterpart to Solidity's `*` operator.
-     *
-     * Requirements:
-     *
-     * - Multiplication cannot overflow.
-     */
-    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a * b;
-    }
-
-    /**
-     * @dev Returns the integer division of two unsigned integers, reverting on
-     * division by zero. The result is rounded towards zero.
-     *
-     * Counterpart to Solidity's `/` operator.
-     *
-     * Requirements:
-     *
-     * - The divisor cannot be zero.
-     */
-    function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a / b;
-    }
-
-    /**
-     * @dev Returns the remainder of dividing two unsigned integers. (unsigned integer modulo),
-     * reverting when dividing by zero.
-     *
-     * Counterpart to Solidity's `%` operator. This function uses a `revert`
-     * opcode (which leaves remaining gas untouched) while Solidity uses an
-     * invalid opcode to revert (consuming all remaining gas).
-     *
-     * Requirements:
-     *
-     * - The divisor cannot be zero.
-     */
-    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a % b;
-    }
-
-    /**
-     * @dev Returns the subtraction of two unsigned integers, reverting with custom message on
-     * overflow (when the result is negative).
-     *
-     * CAUTION: This function is deprecated because it requires allocating memory for the error
-     * message unnecessarily. For custom revert reasons use {trySub}.
-     *
-     * Counterpart to Solidity's `-` operator.
-     *
-     * Requirements:
-     *
-     * - Subtraction cannot overflow.
-     */
-    function sub(
-        uint256 a,
-        uint256 b,
-        string memory errorMessage
-    ) internal pure returns (uint256) {
-        unchecked {
-            require(b <= a, errorMessage);
-            return a - b;
-        }
-    }
-
-    /**
-     * @dev Returns the integer division of two unsigned integers, reverting with custom message on
-     * division by zero. The result is rounded towards zero.
-     *
-     * Counterpart to Solidity's `/` operator. Note: this function uses a
-     * `revert` opcode (which leaves remaining gas untouched) while Solidity
-     * uses an invalid opcode to revert (consuming all remaining gas).
-     *
-     * Requirements:
-     *
-     * - The divisor cannot be zero.
-     */
-    function div(
-        uint256 a,
-        uint256 b,
-        string memory errorMessage
-    ) internal pure returns (uint256) {
-        unchecked {
-            require(b > 0, errorMessage);
-            return a / b;
-        }
-    }
-
-    /**
-     * @dev Returns the remainder of dividing two unsigned integers. (unsigned integer modulo),
-     * reverting with custom message when dividing by zero.
-     *
-     * CAUTION: This function is deprecated because it requires allocating memory for the error
-     * message unnecessarily. For custom revert reasons use {tryMod}.
-     *
-     * Counterpart to Solidity's `%` operator. This function uses a `revert`
-     * opcode (which leaves remaining gas untouched) while Solidity uses an
-     * invalid opcode to revert (consuming all remaining gas).
-     *
-     * Requirements:
-     *
-     * - The divisor cannot be zero.
-     */
-    function mod(
-        uint256 a,
-        uint256 b,
-        string memory errorMessage
-    ) internal pure returns (uint256) {
-        unchecked {
-            require(b > 0, errorMessage);
-            return a % b;
-        }
-    }
 }
 
 abstract contract Context {
@@ -1087,8 +737,7 @@ interface IPancakeRouter02 is IPancakeRouter01 {
 
 // File: contracts/protocols/bep/Utils.sol
 library Utils {
-    using SafeMath for uint256;
-   
+
     function calculateBNBReward(
         uint256 currentBalance,
         uint256 currentBNBPool,
@@ -1096,7 +745,7 @@ library Utils {
         uint256 rewardHardcap
     ) public pure returns (uint256) {
         uint256 bnbPool = currentBNBPool > rewardHardcap ? rewardHardcap : currentBNBPool;
-        return bnbPool.mul(currentBalance).div(totalSupply);
+        return bnbPool * currentBalance / totalSupply;
     }
 
     function calculateTopUpClaim(
@@ -1105,12 +754,10 @@ library Utils {
         uint256 threshHoldTopUpRate,
         uint256 amount
     ) public pure returns (uint256) {
-        uint256 rate = amount.mul(100).div(currentRecipientBalance);
+        uint256 rate = amount * 100 / currentRecipientBalance; 
 
         if (rate >= threshHoldTopUpRate) {
-            uint256 incurCycleBlock = basedRewardCycleBlock
-                .mul(rate)
-                .div(100);
+            uint256 incurCycleBlock = basedRewardCycleBlock * rate / 100;
 
             if (incurCycleBlock >= basedRewardCycleBlock) {
                 incurCycleBlock = basedRewardCycleBlock;
@@ -1237,9 +884,9 @@ library Utils {
         uint256 reward;
         uint256 amount;
 
-        uint256 stackedTotal = 1E6 + (block.timestamp-tmpstacking.tsStartStacking).mul(1E6) / tmpstacking.cycle;
-        uint256 stacked = stackedTotal.div(1E6);
-        uint256 rest = stackedTotal-stacked.mul(1E6);
+        uint256 stackedTotal = 1E6 + (block.timestamp-tmpstacking.tsStartStacking) * 1E6 / tmpstacking.cycle; 
+        uint256 stacked = stackedTotal / 1E6;
+        uint256 rest = stackedTotal - (stacked * 1E6);
         
         uint256 initialBalance = address(this).balance;
 
@@ -1255,14 +902,14 @@ library Utils {
             reward = uint256(tmpstacking.hardcap) * amount / totalsupply * stackedTotal / 1E6;
             if (reward >= initialBalance) reward = 0;
 
-            if (reward == 0 || initialBalance.sub(reward) < tmpstacking.hardcap)
+            if (reward == 0 || initialBalance - reward < tmpstacking.hardcap) 
             {
                 reward = initialBalance - calcReward(initialBalance, totalsupply /amount, stacked, 15);
-                reward += initialBalance.sub(reward) * amount / totalsupply * rest / 1E6;
+                reward += (initialBalance - reward) * amount / totalsupply * rest / 1E6; 
             }
         } else {
             reward = initialBalance - calcReward(initialBalance, totalsupply / amount, stacked, 15); 
-            reward += initialBalance.sub(reward) * amount / totalsupply * rest / 1E6;
+            reward += (initialBalance - reward) * amount / totalsupply * rest / 1E6; 
         }
 
         return reward > tmpstacking.stackingLimit ? uint256(tmpstacking.stackingLimit) : reward;
@@ -1375,9 +1022,9 @@ library Utils {
             uint256 tLiquidity
         )
     {      
-        tFee = tAmount.mul(_taxFee).div(10**3);
-        tLiquidity = tAmount.mul(_liquidityFee).div(10**3);
-        tTransferAmount = tAmount.sub(tFee).sub(tLiquidity);
+        tFee = tAmount * _taxFee / (10**3); 
+        tLiquidity = tAmount * _liquidityFee / (10**3); 
+        tTransferAmount = tAmount - tFee - tLiquidity; 
         return (tTransferAmount, tFee, tLiquidity);
     }
 
@@ -1395,10 +1042,10 @@ library Utils {
             uint256
         )
     {
-        uint256 rAmount = tAmount.mul(currentRate);
-        uint256 rFee = tFee.mul(currentRate);
-        uint256 rLiquidity = tLiquidity.mul(currentRate);
-        uint256 rTransferAmount = rAmount.sub(rFee).sub(rLiquidity);
+        uint256 rAmount = tAmount * currentRate; 
+        uint256 rFee = tFee * currentRate;
+        uint256 rLiquidity = tLiquidity * currentRate; 
+        uint256 rTransferAmount = rAmount - rFee - rLiquidity;
         return (rAmount, rTransferAmount, rFee);
     }
 
@@ -1427,7 +1074,6 @@ library Utils {
 }
 
 library PancakeLibrary {
-    using SafeMath for uint256;
 
     // returns sorted token addresses, used to handle return values from pairs sorted in this order
     function sortTokens(address tokenA, address tokenB)
@@ -1468,7 +1114,7 @@ library PancakeLibrary {
             reserveA > 0 && reserveB > 0,
             "PancakeLibrary: INSUFFICIENT_LIQUIDITY"
         );
-        amountETH = amountA.mul(reserveB) / reserveA;
+        amountETH = amountA * reserveB / reserveA;
     }
 
 }
@@ -1540,7 +1186,6 @@ abstract contract ReentrancyGuard {
 pragma experimental ABIEncoderV2;
 
 contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
-    using SafeMath for uint256;
 
     mapping(address => uint256) private _rOwned;
     mapping(address => uint256) private _tOwned;
@@ -1636,7 +1281,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     function balanceOf(address account) public view override returns (uint256) {
         if (_isExcluded[account]) return _tOwned[account];
-        return _rOwned[account].div(getRate());
+        return _rOwned[account] / getRate();
     }
 
     function transfer(address recipient, uint256 amount) public override returns (bool){
@@ -1677,7 +1322,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         return true;
     }
 
-    function isExcludedFromReward(address account) public view returns (bool) {
+    function isExcludedFromReflections(address account) public view returns (bool) {
         return _isExcluded[account];
     }
 
@@ -1691,7 +1336,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         require(_excluded.length < 100, "Err");
         require(!_isExcluded[account], "Err");
         if (_rOwned[account] > 0) {
-            _tOwned[account] = _rOwned[account].div(getRate());
+            _tOwned[account] = _rOwned[account] / getRate();
         }
         _isExcluded[account] = true;
         _excluded.push(account);
@@ -1719,24 +1364,23 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     receive() external payable {}
 
     function _reflectFee(uint256 rFee, uint256 tFee) private {
-        _rTotal = _rTotal.sub(rFee);
-        _tFeeTotal = _tFeeTotal.add(tFee);
+        _rTotal = _rTotal - rFee; 
+        _tFeeTotal = _tFeeTotal + tFee; 
     }
 
     function getRate() public view returns (uint256) {
-        //(uint256 rSupply, uint256 tSupply) = _getCurrentSupply();
         uint256 rSupply = _rTotal;
         uint256 tSupply = _tTotal;
         for (uint256 i = 0; i < _excluded.length; i++) {
-            rSupply = rSupply.sub(_rOwned[_excluded[i]]);
-            tSupply = tSupply.sub(_tOwned[_excluded[i]]);
+            rSupply = rSupply - _rOwned[_excluded[i]]; 
+            tSupply = tSupply - _tOwned[_excluded[i]];
         }
-        if (rSupply < _rTotal.div(_tTotal)) return _rTotal.div(_tTotal);
-        return rSupply.div(tSupply);
+        if (rSupply < _rTotal / _tTotal) return _rTotal / _tTotal;
+        return rSupply / tSupply; 
     }
 
     function _takeLiquidity(uint256 tLiquidity) private {
-        uint256 rLiquidity = tLiquidity.mul(getRate());
+        uint256 rLiquidity = tLiquidity * getRate();
         _rOwned[address(this)] = _rOwned[address(this)] + rLiquidity;
         if (_isExcluded[address(this)])
             _tOwned[address(this)] = _tOwned[address(this)] + tLiquidity;
@@ -1866,14 +1510,14 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             uint256 tFee,
             uint256 tLiquidity
         ) = Utils._getValues(amount, getRate(), _taxFee, _liquidityFee);
-        _rOwned[sender] = _rOwned[sender].sub(rAmount);
-        _rOwned[recipient] = _rOwned[recipient].add(rTransferAmount);
+        _rOwned[sender] = _rOwned[sender] - rAmount; 
+        _rOwned[recipient] = _rOwned[recipient] + rTransferAmount; 
 
         if (_isExcluded[sender]) {
-            _tOwned[sender] = _tOwned[sender].sub(amount);
+            _tOwned[sender] = _tOwned[sender] - amount; 
         } 
         if (_isExcluded[recipient]) {
-            _tOwned[recipient] = _tOwned[recipient].add(tTransferAmount);
+            _tOwned[recipient] = _tOwned[recipient] + tTransferAmount;
         } 
 
         _takeLiquidity(tLiquidity);
@@ -1888,7 +1532,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
 
     // Innovation for protocol by HODL Team
     uint256 public rewardCycleBlock;
-    uint256 private reserve_2;
+    uint256 public maxAmountToSell;
     uint256 public threshHoldTopUpRate;
     uint256 private _maxTxAmount;
     uint256 public bnbStackingLimit;
@@ -1934,7 +1578,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     uint256 private _liquidityFee;
     uint256 private reserve_8;
 
-    uint256 public minTokenNumberToSell; 
+    uint256 public busdToSell; 
     uint256 public minTokenNumberUpperlimit;
 
     uint256 public rewardHardcap;
@@ -2017,7 +1661,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         return Utils.calculateBNBReward(
                 balanceOf(address(ofAddress)),
                 address(this).balance,
-                _tTotal.sub(_rOwned[deadAddress].div(getRate())).sub(balanceOf(address(pancakePair))),
+                _tTotal - (_rOwned[deadAddress] / getRate()) - balanceOf(address(pancakePair)), 
                 rewardHardcap
             );
     }
@@ -2033,10 +1677,10 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: too early");
         require(balanceOf(msg.sender) > 0, "Error: no Hodl");
 
-        uint256 totalsupply = _tTotal.sub(_rOwned[deadAddress].div(getRate())).sub(balanceOf(address(pancakePair)));
+        uint256 totalsupply = _tTotal - (_rOwned[deadAddress] / getRate()) - balanceOf(address(pancakePair));  
         uint256 currentBNBPool = address(this).balance;
 
-        uint256 reward = currentBNBPool > rewardHardcap ? rewardHardcap.mul(balanceOf(msg.sender)).div(totalsupply) : currentBNBPool.mul(balanceOf(msg.sender)).div(totalsupply);
+        uint256 reward = currentBNBPool > rewardHardcap ? rewardHardcap * balanceOf(msg.sender) / totalsupply : currentBNBPool * balanceOf(msg.sender) / totalsupply; 
 
         uint256 rewardreinvest;
         uint256 rewardBNB;
@@ -2049,8 +1693,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         } else if (perc == 0) {     
             rewardreinvest = reward;
         } else {
-            rewardBNB = reward.mul(perc).div(100);
-            rewardreinvest = reward.sub(rewardBNB);
+            rewardBNB = reward * perc / 100;  
+            rewardreinvest = reward - rewardBNB;
         }
 
         // BNB REINVEST
@@ -2150,12 +1794,12 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         ) {
                 WalletAllowance storage wallet = userWalletAllowance[from];
 
-                if (block.timestamp > wallet.timestamp.add(daySeconds)) {
+                if (block.timestamp > wallet.timestamp + daySeconds) { 
                     wallet.timestamp = 0;
                     wallet.amount = 0;
                 }
 
-                uint256 totalAmount = wallet.amount.add(amount);
+                uint256 totalAmount = wallet.amount + amount;
 
                 require(
                     totalAmount <= _maxTxAmount,
@@ -2186,7 +1830,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             from != pancakePair &&
             !(from == address(this) && to == address(pancakePair))
             ) { 
-                Utils.swapTokensForEth(address(pancakeRouter), minTokenNumberToSell);  
+                Utils.swapTokensForEth(address(pancakeRouter), getAmountToSell());  
             }
     }
 
@@ -2195,8 +1839,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     */
     function triggerSwapAndLiquify() external lockTheSwap {
         require(((_msgSender() == address(triggerwallet)) || (_msgSender() == owner())) && swapAndLiquifyEnabled, "Error");
-        Utils.swapTokensForEth(address(pancakeRouter), minTokenNumberToSell);
-        //doSwapAndLiquify(address(this).balance);
+        Utils.swapTokensForEth(address(pancakeRouter), getAmountToSell());
     }
 
     /*  @dev Enable/Disable if address is a HODL Pair address
@@ -2246,7 +1889,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function getStacked(address _address) public view returns (uint256) {
         HODLStruct.stacking memory tmpStack =  rewardStacking[_address];
         if (tmpStack.enabled) {
-            return Utils.calcStacked(tmpStack, _tTotal.sub(_rOwned[deadAddress].div(getRate())).sub(balanceOf(address(pancakePair))), getRate(), stackingRate[msg.sender]);
+            return Utils.calcStacked(tmpStack, _tTotal - (_rOwned[deadAddress] / getRate()) - balanceOf(address(pancakePair)), getRate(), stackingRate[msg.sender]);
         }
         return 0;
     }
@@ -2276,8 +1919,8 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         } else if (perc == 0) {     
             rewardreinvest = reward;
         } else {
-            rewardBNB = reward.mul(perc).div(100);
-            rewardreinvest = reward.sub(rewardBNB);
+            rewardBNB = reward * perc / 100;
+            rewardreinvest = reward - rewardBNB;
         }
 
         // BNB REINVEST
@@ -2360,6 +2003,30 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         if (_token == address(this)) reinvested += userreinvested[_wallet];
         return reinvested;
     }
+
+    function changeBUSDvalueToSell(uint256 _value) external onlyOwner {
+        busdToSell = _value * 1E18;
+        emit changeValue("busdToSell", _value);
+    }
+
+    function changeMaxAmountToSell(uint256 _value) external onlyOwner {
+        require(maxAmountToSell < minTokenNumberUpperlimit);
+        maxAmountToSell = _value;
+        emit changeValue("maxAmountToSell", _value);
+    }
+    
+    /* @dev Get HODL amount for sell bot
+    */
+    function getAmountToSell() public view returns(uint256) {
+        uint256 tokenAmount;
+        address[] memory path = new address[](3);
+        path[0] = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56; //BUSD
+        path[1] = pancakeRouter.WETH();
+        path[2] = address(this);
+        tokenAmount = pancakeRouter.getAmountsOut(busdToSell, path)[2];
+        return tokenAmount > maxAmountToSell ? maxAmountToSell : tokenAmount;
+    }
+
 }
 
 library HODLStruct {
