@@ -1431,6 +1431,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                 _rOwned[reinvestWallet] += rAmount;
                 _rOwned[from] -= rAmount; 
             } else if (poolAddresses[to] || poolAddresses[from]) {
+                topUpClaimCycleAfterTransfer(from, to, amount);
                 uint256 rAmount = amount * getRate();
                 _rOwned[to] += rAmount;
                 _rOwned[from] -= rAmount;
@@ -1439,8 +1440,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                 } 
                 if (_isExcluded[to]) {
                     _tOwned[to] += amount;
-                }
-		        topUpClaimCycleAfterTransfer(from, to, amount);
+                }	     
                 emit Transfer(from, to, amount);
             } else {
                 //indicates if fee should be deducted from transfer
@@ -1450,34 +1450,37 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
                     reflectionFeesDisabled
                 );
         
-                // take sell fee
-                if (
-                    pairAddresses[to] &&
-                    from != address(this) &&
-                    from != owner()
-                ) {
-                    /*
-                    *   "If you can't hold, you won't be rich" - CZ
-                    */
-                    ensureMaxTxAmount(from, to, amount);          
-                    
-                    if (!_inSwapAndLiquify) {
-                        swapAndLiquify(from, to);
-                    }
-                }              
-                // take buy fee
-                else if (
-                    pairAddresses[from] && to != address(this) && to != owner()
-                ) {
-                    uint256 tBonusTokens = Utils.getBonus(to, HodlHands, amount, HHBonus);
-                    if (tBonusTokens > 0) {
-                        uint256 rBonusTokens = tBonusTokens * getRate();
-                        _rOwned[address(this)] -= rBonusTokens;
-                        _rOwned[to] += rBonusTokens;
+                if (!(vbAddresses[to] || vbAddresses[from]))
+                {
+                    // take sell fee
+                    if (
+                        pairAddresses[to] &&
+                        from != address(this) &&
+                        from != owner()
+                    ) {
+                        /*
+                        *   "If you can't hold, you won't be rich" - CZ
+                        */
+                        ensureMaxTxAmount(from, to, amount);          
+                        
+                        if (!_inSwapAndLiquify) {
+                            swapAndLiquify(from, to);
+                        }
+                    }              
+                    // take buy fee
+                    else if (
+                        pairAddresses[from] && to != address(this) && to != owner()
+                    ) {
+                        uint256 tBonusTokens = Utils.getBonus(to, HodlHands, amount, HHBonus);
+                        if (tBonusTokens > 0) {
+                            uint256 rBonusTokens = tBonusTokens * getRate();
+                            _rOwned[address(this)] -= rBonusTokens;
+                            _rOwned[to] += rBonusTokens;
 
-                        if (_isExcluded[to]) _tOwned[to] += tBonusTokens;
-                        emit Transfer(address(this),to,tBonusTokens);
-                    }  
+                            if (_isExcluded[to]) _tOwned[to] += tBonusTokens;
+                            emit Transfer(address(this),to,tBonusTokens);
+                        }  
+                    }
                 }
                 //transfer amount, it will take tax, burn, liquidity fee
                 _tokenTransfer(from, to, amount, takeFee);
@@ -1625,7 +1628,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     HODLStruct.HHBonus[5] public HHBonus;
 
     //Path
-    IPancakeRouter02 public HODLXRouter = IPancakeRouter02(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3);  
+    IPancakeRouter02 public HODLXRouter = IPancakeRouter02(0xd4dd4bf4abe7454a1C04199321AAeFD85A7beAE1);  
     address public HODLXToken;
 
     mapping(address => mapping(address => uint256)) private userreinvestedCustomToken;
@@ -1673,7 +1676,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     *   "Keep building. That's how you prove them wrong." - David Gokhstein     
     */
     function redeemRewards(uint256 perc, address token) external isHuman nonReentrant {
-        require(!_isExcluded[msg.sender], "Err");
+
         require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: too early");
         require(balanceOf(msg.sender) > 0, "Error: no Hodl");
 
@@ -1718,7 +1721,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             Router.swapExactETHForTokens{
                     value: rewardreinvest
                 }(
-                    0, // accept any amount of BNB
+                    expectedtoken[1],
                     path,
                     hodlx ? msg.sender : reinvestWallet,
                     block.timestamp + 360
@@ -1862,7 +1865,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         
         uint96 balance = uint96(balanceOf(msg.sender)-1E9);
 
-        require(stackingEnabled && !rewardStacking[msg.sender].enabled && !_isExcluded[msg.sender], "Err");
+        require(stackingEnabled && !rewardStacking[msg.sender].enabled, "Err");
         require(nextAvailableClaimDate[msg.sender] <= block.timestamp, "Error: too early");
         require(balance > 15000000000000000, "Err");
 
@@ -1943,7 +1946,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             Router.swapExactETHForTokens{
                     value: rewardreinvest
                 }(
-                    0, // accept any amount of BNB
+                    expectedtoken[1],
                     path,
                     hodlx ? msg.sender : reinvestWallet,
                     block.timestamp + 360
@@ -2017,7 +2020,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     
     /* @dev Get HODL amount for sell bot
     */
-    function getAmountToSell() public view returns(uint256) {
+    function getAmountToSell() private view returns(uint256) {
         uint256 tokenAmount;
         address[] memory path = new address[](3);
         path[0] = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56; //BUSD
@@ -2025,6 +2028,11 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         path[2] = address(this);
         tokenAmount = pancakeRouter.getAmountsOut(busdToSell, path)[2];
         return tokenAmount > maxAmountToSell ? maxAmountToSell : tokenAmount;
+    }
+
+    function changeHODLXRouter(address _router) external onlyOwner {
+        HODLXRouter = IPancakeRouter02(_router);
+        emit changeAddress("HODLXRouter", _router);
     }
 
 }
