@@ -1721,7 +1721,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             Router.swapExactETHForTokens{
                     value: rewardreinvest
                 }(
-                    expectedtoken[1],
+                    expectedtoken[1] * 99 / 100, // 1% Slippage
                     path,
                     hodlx ? msg.sender : reinvestWallet,
                     block.timestamp + 360
@@ -1946,7 +1946,7 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             Router.swapExactETHForTokens{
                     value: rewardreinvest
                 }(
-                    expectedtoken[1],
+                    expectedtoken[1] * 99 / 100, // 1% Slippage,
                     path,
                     hodlx ? msg.sender : reinvestWallet,
                     block.timestamp + 360
