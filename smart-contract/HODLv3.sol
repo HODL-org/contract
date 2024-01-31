@@ -2030,9 +2030,18 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         return tokenAmount > maxAmountToSell ? maxAmountToSell : tokenAmount;
     }
 
+    /* @dev Change HODLX Router
+    */
     function changeHODLXRouter(address _router) external onlyOwner {
         HODLXRouter = IPancakeRouter02(_router);
         emit changeAddress("HODLXRouter", _router);
+    }
+
+    /* @dev Change max limit for stacking
+    */
+    function changeBnbStackingLimit(uint256 _value) external onlyOwner {
+        bnbStackingLimit = _value;
+        emit changeValue("bnbStackingLimit", _value);
     }
 
 }
