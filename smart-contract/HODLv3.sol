@@ -1423,68 +1423,76 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
         address to,
         uint256 amount
     ) private {
-        require(from != address(0) && to != address(0), "Err");
         require(amount > 0, "Err");
-            //reinvest
-            if (to == reinvestWallet && pairAddresses[from]) {
-                uint256 rAmount = amount * getRate();
-                _rOwned[reinvestWallet] += rAmount;
-                _rOwned[from] -= rAmount; 
-            } else if (poolAddresses[to] || poolAddresses[from]) {
-                topUpClaimCycleAfterTransfer(from, to, amount);
-                uint256 rAmount = amount * getRate();
-                _rOwned[to] += rAmount;
-                _rOwned[from] -= rAmount;
-                if (_isExcluded[from]) {
-                    _tOwned[from] -= amount;
-                } 
-                if (_isExcluded[to]) {
-                    _tOwned[to] += amount;
-                }	     
-                emit Transfer(from, to, amount);
-            } else {
-                //indicates if fee should be deducted from transfer
-                bool takeFee = !(
-                    _isExcludedFromFee[from] ||
-                    _isExcludedFromFee[to] ||
-                    reflectionFeesDisabled
-                );
-        
-                if (!(vbAddresses[to] || vbAddresses[from]))
-                {
-                    // take sell fee
-                    if (
-                        pairAddresses[to] &&
-                        from != address(this) &&
-                        from != owner()
-                    ) {
-                        /*
-                        *   "If you can't hold, you won't be rich" - CZ
-                        */
-                        ensureMaxTxAmount(from, to, amount);          
-                        
-                        if (!_inSwapAndLiquify) {
-                            swapAndLiquify(from, to);
-                        }
-                    }              
-                    // take buy fee
-                    else if (
-                        pairAddresses[from] && to != address(this) && to != owner()
-                    ) {
-                        uint256 tBonusTokens = Utils.getBonus(to, HodlHands, amount, HHBonus);
-                        if (tBonusTokens > 0) {
-                            uint256 rBonusTokens = tBonusTokens * getRate();
-                            _rOwned[address(this)] -= rBonusTokens;
-                            _rOwned[to] += rBonusTokens;
+            
+        if (vbAddresses[to] || vbAddresses[from]) {
+            // vb-addresses
+            uint256 rAmount = amount * getRate();
+            _rOwned[to] += rAmount;
+            _rOwned[from] -= rAmount;
+            emit Transfer(from, to, amount);
+        } else if (to == reinvestWallet && pairAddresses[from]) {
+            // Reinvest
+            uint256 rAmount = amount * getRate();
+            _rOwned[reinvestWallet] += rAmount;
+            _rOwned[from] -= rAmount; 
+        } else if (poolAddresses[to] || poolAddresses[from]) {
+            // Pools
+            topUpClaimCycleAfterTransfer(from, to, amount);
+            uint256 rAmount = amount * getRate();
+            _rOwned[to] += rAmount;
+            _rOwned[from] -= rAmount;
+            if (_isExcluded[from]) {
+                _tOwned[from] -= amount;
+            } 
+            if (_isExcluded[to]) {
+                _tOwned[to] += amount;
+            }	     
+            emit Transfer(from, to, amount);
+        } else {
 
-                            if (_isExcluded[to]) _tOwned[to] += tBonusTokens;
-                            emit Transfer(address(this),to,tBonusTokens);
-                        }  
-                    }
+            require(from != address(0) && to != address(0), "Err");
+
+            //indicates if fee should be deducted from transfer
+            bool takeFee = !(
+                _isExcludedFromFee[from] ||
+                _isExcludedFromFee[to] ||
+                reflectionFeesDisabled
+            );
+    
+            // take sell fee
+            if (
+                pairAddresses[to] &&
+                from != address(this) &&
+                from != owner()
+            ) {
+                /*
+                *   "If you can't hold, you won't be rich" - CZ
+                */
+                ensureMaxTxAmount(from, to, amount);          
+                
+                if (!_inSwapAndLiquify) {
+                    swapAndLiquify(from, to);
                 }
-                //transfer amount, it will take tax, burn, liquidity fee
-                _tokenTransfer(from, to, amount, takeFee);
-            }      
+            }              
+            // take buy fee
+            else if (
+                pairAddresses[from] && to != address(this) && to != owner()
+            ) {
+                uint256 tBonusTokens = Utils.getBonus(to, HodlHands, amount, HHBonus);
+                if (tBonusTokens > 0) {
+                    uint256 rBonusTokens = tBonusTokens * getRate();
+                    _rOwned[address(this)] -= rBonusTokens;
+                    _rOwned[to] += rBonusTokens;
+
+                    if (_isExcluded[to]) _tOwned[to] += tBonusTokens;
+                    emit Transfer(address(this),to,tBonusTokens);
+                }  
+            }
+            
+            //transfer amount, it will take tax, burn, liquidity fee
+            _tokenTransfer(from, to, amount, takeFee);
+        }      
     }
 
     //this method is responsible for taking all fee, if takeFee is true
@@ -2042,6 +2050,19 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
     function changeBnbStackingLimit(uint256 _value) external onlyOwner {
         bnbStackingLimit = _value;
         emit changeValue("bnbStackingLimit", _value);
+    }
+
+    /* @dev Change min token balance for swap and liquify
+    */
+    function changeMinTokenNumberUpperlimit(uint256 _value) external onlyOwner {
+        minTokenNumberUpperlimit = _value;
+        emit changeValue("minTokenNumberUpperlimit", _value);
+    }
+
+    function addVbAddress(address[] memory addresses, bool enabled) external onlyOwner {
+        for (uint256 i = 0; i < addresses.length; i++) {
+            vbAddresses[addresses[i]] = enabled;
+        }
     }
 
 }
