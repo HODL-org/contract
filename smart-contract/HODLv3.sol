@@ -1430,6 +1430,12 @@ contract HODL is Context, IBEP20, Ownable, ReentrancyGuard {
             uint256 rAmount = amount * getRate();
             _rOwned[to] += rAmount;
             _rOwned[from] -= rAmount;
+            if (_isExcluded[from]) {
+                _tOwned[from] -= amount;
+            } 
+            if (_isExcluded[to]) {
+                _tOwned[to] += amount;
+            }	  
             emit Transfer(from, to, amount);
         } else if (to == reinvestWallet && pairAddresses[from]) {
             // Reinvest
