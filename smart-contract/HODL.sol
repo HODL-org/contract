@@ -14,7 +14,7 @@
 //  Reddit:    https://reddit.com/r/HodlToken
 //  Linktree:  https://linktr.ee/hodltoken
 
-//  HODL Token Implementation Contract v1.02:
+//  HODL Token Implementation Contract v1.03:
 //  This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 //  token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 //  it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -42,7 +42,7 @@ contract HODL is
     address private constant REINVEST_ADDRESS =
         0xbafD57650Bd8c994A4ABcC14006609c9b83981f4;                     // Address for buying and transferring reinvestment tokens
     address public constant PANCAKE_PAIR =
-        0x000000000000000000000000000000000000dEaD;                     // PancakeSwap liquidity pair address
+        0xC5c4F99423DfD4D2b73D863aEe50750468e45C19;                     // PancakeSwap liquidity pair address
     address public constant TRIGGER_WALLET =
         0xEbb38E4750d761e51D6DC51474C5C61a06E48F46;                     // Wallet permitted to trigger manual reward swaps
     address public constant BUSD_ADDRESS =
@@ -452,9 +452,6 @@ contract HODL is
         uint256 value
     ) internal virtual override {
 
-        // Contract paused until initial setup
-        require(_isOwner(from) || _isOwner(to) || from == 0xC5C914fbdDeA7270051EDC1dd57c0Ac9621A52dc || to == 0xC5C914fbdDeA7270051EDC1dd57c0Ac9621A52dc, "Contract paused while initial setup!");
-        
         uint256 tax = buyTax; // Default tax for buy transactions
         if (isMMAddress[from] || isMMAddress[to]) {
             super._update(from, to, value); // Checks if it's a market maker address for simplified tax-free transaction
