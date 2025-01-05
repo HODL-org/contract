@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: MIT
 
-//   __    __    ______    _____      __
-//  |  |  |  |  /  __  \  |      \   |  |
-//  |  |__|  | |  |  |  | |   _   \  |  |
-//  |   __   | |  |  |  | |  |_)   | |  |
-//  |  |  |  | |  `--'  | |       /  |  |____
-//  |__|  |__|  \______/  |_____ /   |_______|
-//                  HODL TOKEN
+//  __    __    ______    _____      __
+// |  |  |  |  /  __  \  |      \   |  |
+// |  |__|  | |  |  |  | |   _   \  |  |
+// |   __   | |  |  |  | |  |_)   | |  |
+// |  |  |  | |  `--'  | |       /  |  |____
+// |__|  |__|  \______/  |_____ /   |_______|
+//                 HODL TOKEN
 //
-//  Website:   https://hodltoken.net
-//  Telegram:  https://t.me/hodlinvestorgroup
-//  X:         https://x.com/HODL_Official
-//  Reddit:    https://reddit.com/r/HodlToken
-//  Linktree:  https://linktr.ee/hodltoken
+// Website:   https://hodltoken.net
+// Telegram:  https://t.me/hodlinvestorgroup
+// X:         https://x.com/HODL_Official
+// Reddit:    https://reddit.com/r/HodlToken
+// Linktree:  https://linktr.ee/hodltoken
 
-//  HODL Token Implementation Contract v1.03:
-//  This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
-//  token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
-//  it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
+// HODL Token Implementation Contract v1.04:
+// This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
+// token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
+// it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
 
 pragma solidity 0.8.26;
 
@@ -649,7 +649,7 @@ contract HODL is
             tokenSwapPercentage;
 
         // Calculate the total tokens to sell based on the combined percentage (in basis points) and the contract token balance
-        return (contractTokenBalance * swapPercentage) / 10000;
+        return (contractTokenBalance * swapPercentage) / 100000;
     }
 
     // Swaps tokens for BNB using PancakeSwap to fund the reward pool
