@@ -14,7 +14,7 @@
 // Reddit:    https://reddit.com/r/HodlToken
 // Linktree:  https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.04:
+// HODL Token Implementation Contract v1.05:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -333,10 +333,10 @@ contract HODL is
     }
 
     // Manually trigger a reward swap using the designated trigger wallet
-    function triggerSwapForReward() external lockTheSwap onlyPermitted {
+    function triggerSwapForReward() external lockTheSwap {
         require(
-            msg.sender == address(TRIGGER_WALLET) && rewardSwapEnabled,
-            "Unauthorized or swap disabled"
+            msg.sender == address(TRIGGER_WALLET),
+            "Unauthorized"
         );
         uint256 contractTokenBalance = super.balanceOf(address(this));
         uint256 currentPoolBalance = address(this).balance;
@@ -576,7 +576,7 @@ contract HODL is
     function updateClaimDateAfterTransfer(address to, uint256 value) private {
         uint256 currentBalance = super.balanceOf(to);
         uint256 nextClaim = nextClaimDate[to];
-        if ((_isOwner(to) && nextClaim == 0) || currentBalance == 0) {
+        if (nextClaim == 0 || currentBalance == 0) {
             nextClaimDate[to] = block.timestamp + rewardClaimPeriod;
         } else {
             nextClaim += calculateUpdateClaim(currentBalance, value);
@@ -594,7 +594,6 @@ contract HODL is
         // Trigger reward swap if pool balance meets threshold and is below cap
         if (
             contractTokenBalance >= minTokensTriggerRewardSwap &&
-            currentPoolBalance <= bnbRewardPoolCap &&
             from != PANCAKE_PAIR &&
             !(from == address(this) && to == address(PANCAKE_PAIR))
         ) {
