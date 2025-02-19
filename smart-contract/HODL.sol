@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.06:
+// HODL Token Implementation Contract v1.07:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -25,7 +25,7 @@ import {HODLOwnableUpgradeable} from "./HODLOwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "https://github.com/pancakeswap/pancake-smart-contracts/projects/exchange-protocol/contracts/interfaces/IPancakeRouter02.sol";
+import "./interfaces/IPancakeRouter02.sol";
 import "./HODLTypes.sol";
 
 contract HODL is
@@ -44,7 +44,7 @@ contract HODL is
     address public constant PANCAKE_PAIR =
         0xC5c4F99423DfD4D2b73D863aEe50750468e45C19;                     // PancakeSwap liquidity pair address
     address public constant TRIGGER_WALLET =
-        0xEbb38E4750d761e51D6DC51474C5C61a06E48F46;                     // Wallet permitted to trigger manual reward swaps
+        0xC32F84D0a435cd8ebAd6b02c82064028F848a8bd;                     // Wallet permitted to trigger manual reward swaps
     address public constant USDT_ADDRESS =
         0x55d398326f99059fF775485246999027B3197955;                     // USDT address for token value calculation
     IPancakeRouter02 public constant PANCAKE_ROUTER =
@@ -126,6 +126,20 @@ contract HODL is
 
     // Accepts BNB sent directly to the contract
     receive() external payable {}
+
+    function upgrade() external onlyOwner reinitializer(3) {
+        // Update rewardPoolShare
+        rewardPoolShare = super.totalSupply()
+            - super.balanceOf(address(this))                                // Contract
+            - super.balanceOf(0x29cC45Dc85A08350BcFf072805E032e97E0e7BEB)   // Treasury
+            - super.balanceOf(0x1F1b37947c63f63B08B2dbfcC9225858CBE7A213)   // Reward Pool
+            - super.balanceOf(0xC5C914fbdDeA7270051EDC1dd57c0Ac9621A52dc)   // LP Provision
+            - super.balanceOf(0x390a8C324D1B343280c25E1BD8B4F178e6429D4c)   // MM Fund
+            - super.balanceOf(BURN_ADDRESS)                                 // Burned
+            - super.balanceOf(PANCAKE_PAIR)                                 // LP
+            - super.balanceOf(0xe52e5E41d9602ed042520353EA5CDe383E1A98ea)   // Giveaway
+            - super.balanceOf(0x73c4C016F4Aec3A964bf96dd998C6eeCF3c19D04);  // P2E Holding
+    }
 
     // Ends stacking and claims rewards, applying similar logic as 'redeemReward' using stacked amount
     function stopStackingAndClaim(uint8 perc) external nonReentrant {
@@ -449,6 +463,7 @@ contract HODL is
         uint256 tax = buyTax; // Default tax for buy transactions
         if (isMMAddress[from] || isMMAddress[to]) {
             super._update(from, to, value); // Checks if it's a market maker address for simplified tax-free transaction
+            updateRewardPoolShare(value, from, to); // Update reward pool share figure
         } else {
             bool takeFee = !(isTaxFree[from] || isTaxFree[to]); // Applies fee, unless address is tax exempt
 
@@ -480,6 +495,7 @@ contract HODL is
                 uint256 fees = (value * tax) / 100;
                 value -= fees;
                 super._update(from, address(this), fees);
+                updateRewardPoolShare(fees, from, address(this)); // Update reward pool share figure
             }
 
             // Transfer remaining value to the recipient after tax deduction
