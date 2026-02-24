@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.09:
+// HODL Token Implementation Contract v1.10:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -37,8 +37,8 @@ contract HODL is
     // Constants for reward calculations and token management
     address public constant BURN_ADDRESS =
         0x000000000000000000000000000000000000dEaD; // Burn address for circulating supply calculation
-    address public constant STACKING_ADDRESS =
-        0x02A4FeE688cbD005690738874958Be07E67aE64B; // Designated address for tokens used in reward stacking
+    address private constant MMUPDATER_ADDRESS =
+        0x438245a4C3508d3F3DEabB5093569125D0D19B44; // Address for updating market maker addresses
     address private constant REINVEST_ADDRESS =
         0xbafD57650Bd8c994A4ABcC14006609c9b83981f4; // Address for buying and transferring reinvestment tokens
     address public constant PANCAKE_PAIR =
@@ -61,7 +61,7 @@ contract HODL is
     mapping(address => uint256) public userBNBClaimed; // Total BNB claimed as rewards by all users
     mapping(address => uint256) public userReinvested; // Total tokens claimed as reinvested rewards
     mapping(address => uint256) private userLastBuy; // Timestamp of last buy transaction
-    mapping(address => RewardStacking) public rewardStacking; // User-specific reward stacking details
+    mapping(address => RewardStacking) private rewardStacking; // [UNUSED] User-specific reward stacking details
     mapping(address => WalletAllowance) public userWalletAllowance; // Wallet limits for max daily sell
 
     // Tokenomics settings and parameters
@@ -84,9 +84,9 @@ contract HODL is
     uint256 public updateClaimDateRate; // Threshold for updating user's reward claim timestamp based on balance increase %
     uint256 public bnbRewardPoolCap; // Max BNB in reward pool used in reward calculations
 
-    // Reward stacking parameters
-    uint256 public bnbStackingLimit; // Max reward amount claimable when stacking (in BNB)
-    uint256 public minTokensToStack; // Minimum tokens required to participate in stacking
+    // Rsserves
+    uint256 private reserve_int_1; // Reserve
+    uint256 private reserve_int_2; // Reserve
 
     // Aggregated reward and reinvestment data
     uint256 public totalBNBClaimed; // Total BNB claimed by all users
@@ -94,12 +94,11 @@ contract HODL is
 
     // Contract controls
     bool public rewardSwapEnabled; // Toggle for enabling/disabling reward pool swaps
-    bool private reserve_bool_1; // Reserve
+    bool private reserve_bool; // Reserve
     bool private _inRewardSwap; // Internal lock to prevent reentrancy during reward swaps
 
-    // Token management address
-    address private constant MMUPDATER_ADDRESS =
-        0x438245a4C3508d3F3DEabB5093569125D0D19B44; // Address for updating market maker addresses
+    address private constant RESERVE_ADDRESS =
+        0x0000000000000000000000000000000000000000;
 
     // Events for configuration changes
     event ChangeValue(
@@ -129,38 +128,9 @@ contract HODL is
     // Accepts BNB sent directly to the contract
     receive() external payable {}
 
-    // Ends stacking and claims rewards, applying similar logic as 'redeemReward' using stacked amount
-    function stopStackingAndClaim(uint8 perc) external nonReentrant {
-        if (perc > 100) revert ValueOutOfRange();
-
-        RewardStacking memory tmpStack = rewardStacking[msg.sender];
-
-        require(tmpStack.stackingIsActive, "Stacking not active");
-        uint256 reward = getStacked(msg.sender);
-
-        executeRedeemRewards(perc, reward, msg.sender);
-
-        super._update(STACKING_ADDRESS, msg.sender, tmpStack.stackedAmount);
-
-        delete rewardStacking[msg.sender];
-    }
-
-    // Ends stacking and claims rewards, applying similar logic as 'redeemReward' using stacked amount
-    function stopStackingAndReinvest(
-        address[] memory users
-    ) external onlyOwner nonReentrant {
-        for (uint i = 0; i < users.length; i++) {
-            RewardStacking memory tmpStack = rewardStacking[users[i]];
-
-            require(tmpStack.stackingIsActive, "Stacking not active");
-            uint256 reward = getStacked(users[i]);
-
-            executeRedeemRewards(0, reward, users[i]);
-
-            super._update(STACKING_ADDRESS, users[i], tmpStack.stackedAmount);
-
-            delete rewardStacking[users[i]];
-        }
+    function upgrade() external onlyOwner reinitializer(4) {
+        bnbRewardPoolCap = 20000000000000000000;
+        reinvestBonusCycle = 172800;
     }
 
     // Claims rewards in BNB and or tokens based on user's choice, accounting for reward pool cap
@@ -178,7 +148,47 @@ contract HODL is
             ? (bnbRewardPoolCap * userBalance) / rewardPoolShare
             : (currentBNBPool * userBalance) / rewardPoolShare;
 
-        executeRedeemRewards(perc, reward, msg.sender);
+        uint256 rewardReinvest = 0;
+        uint256 rewardBNB = 0;
+        uint256 nextClaim = block.timestamp + rewardClaimPeriod;
+
+        unchecked {
+            if (perc == 100) {
+                rewardBNB = reward;
+            } else if (perc == 0) {
+                rewardReinvest = reward;
+                nextClaim -= reinvestBonusCycle;
+            } else {
+                rewardBNB = (reward * perc) / 100;
+                rewardReinvest = reward - rewardBNB;
+            }
+        }
+
+        if (perc < 100) {
+            address[] memory path = new address[](2);
+            path[0] = PANCAKE_ROUTER.WETH();
+            path[1] = address(this);
+
+            PANCAKE_ROUTER.swapExactETHForTokens{value: rewardReinvest}(
+                0,
+                path,
+                REINVEST_ADDRESS,
+                block.timestamp + 360
+            );
+            uint256 transferredAmount = super.balanceOf(REINVEST_ADDRESS);
+            userReinvested[msg.sender] += transferredAmount;
+            totalHODLFromReinvests += transferredAmount;
+
+            super._update(REINVEST_ADDRESS, msg.sender, transferredAmount);
+        }
+
+        if (rewardBNB > 0) {
+            (bool success, ) = address(msg.sender).call{value: rewardBNB}("");
+            if (!success) revert BNBTransferFailed();
+            userBNBClaimed[msg.sender] += rewardBNB;
+            totalBNBClaimed += rewardBNB;
+        }
+        nextClaimDate[msg.sender] = nextClaim;
     }
 
     // Excludes or includes an address from taxes
@@ -357,78 +367,6 @@ contract HODL is
         return PANCAKE_ROUTER.getAmountsOut(tokenAmount, path)[2];
     }
 
-    // Calculates reward claim for users participating in reward stacking
-    function getStacked(address wallet) public view returns (uint256) {
-        RewardStacking memory tmpStack = rewardStacking[wallet];
-        if (!tmpStack.stackingIsActive) {
-            return 0;
-        }
-
-        uint256 stackedTotal = 1E6 +
-            ((block.timestamp - tmpStack.stackingStartTimestamp) * 1E6) /
-            tmpStack.claimCycle;
-        uint256 stacked = stackedTotal / 1E6;
-        uint256 rest = stackedTotal - (stacked * 1E6);
-
-        uint256 initialBalance = address(this).balance;
-        uint256 currentRewardPoolShare = rewardPoolShare;
-
-        uint256 reward;
-        if (initialBalance >= tmpStack.rewardPoolCapAtStart) {
-            reward =
-                (((uint256(tmpStack.rewardPoolCapAtStart) *
-                    tmpStack.stackedAmount) / currentRewardPoolShare) *
-                    stackedTotal) /
-                1E6;
-            if (
-                reward >= initialBalance ||
-                initialBalance - reward < tmpStack.rewardPoolCapAtStart
-            ) {
-                reward = _calculateStackedReward(
-                    initialBalance,
-                    tmpStack,
-                    stacked,
-                    rest,
-                    currentRewardPoolShare
-                );
-            }
-        } else {
-            reward = _calculateStackedReward(
-                initialBalance,
-                tmpStack,
-                stacked,
-                rest,
-                currentRewardPoolShare
-            );
-        }
-
-        return
-            reward > tmpStack.rewardLimit
-                ? uint256(tmpStack.rewardLimit)
-                : reward;
-    }
-
-    function _calculateStackedReward(
-        uint256 initialBalance,
-        RewardStacking memory tmpStack,
-        uint256 stacked,
-        uint256 rest,
-        uint256 currentRewardPoolShare
-    ) internal pure returns (uint256) {
-        uint256 reward = initialBalance -
-            calculateReward(
-                initialBalance,
-                currentRewardPoolShare / tmpStack.stackedAmount,
-                stacked,
-                15
-            );
-        reward +=
-            ((((initialBalance - reward) * tmpStack.stackedAmount) /
-                currentRewardPoolShare) * rest) /
-            1E6;
-        return reward;
-    }
-
     // Handles transfers with tax and cooldown logic
     function _update(
         address from,
@@ -508,54 +446,6 @@ contract HODL is
             wallet.lastTransactionTimestamp = block.timestamp;
         }
         wallet.dailySellVolume = totalAmount;
-    }
-
-    function executeRedeemRewards(
-        uint8 perc,
-        uint256 reward,
-        address sender
-    ) private {
-        uint256 rewardReinvest = 0;
-        uint256 rewardBNB = 0;
-        uint256 nextClaim = block.timestamp + rewardClaimPeriod;
-
-        unchecked {
-            if (perc == 100) {
-                rewardBNB = reward;
-            } else if (perc == 0) {
-                rewardReinvest = reward;
-                nextClaim -= reinvestBonusCycle;
-            } else {
-                rewardBNB = (reward * perc) / 100;
-                rewardReinvest = reward - rewardBNB;
-            }
-        }
-
-        if (perc < 100) {
-            address[] memory path = new address[](2);
-            path[0] = PANCAKE_ROUTER.WETH();
-            path[1] = address(this);
-
-            PANCAKE_ROUTER.swapExactETHForTokens{value: rewardReinvest}(
-                0,
-                path,
-                REINVEST_ADDRESS,
-                block.timestamp + 360
-            );
-            uint256 transferredAmount = super.balanceOf(REINVEST_ADDRESS);
-            userReinvested[sender] += transferredAmount;
-            totalHODLFromReinvests += transferredAmount;
-
-            super._update(REINVEST_ADDRESS, sender, transferredAmount);
-        }
-
-        if (rewardBNB > 0) {
-            (bool success, ) = address(msg.sender).call{value: rewardBNB}("");
-            if (!success) revert BNBTransferFailed();
-            userBNBClaimed[msg.sender] += rewardBNB;
-            totalBNBClaimed += rewardBNB;
-        }
-        nextClaimDate[msg.sender] = nextClaim;
     }
 
     // Updates the next eligible claim timestamp after a token transfer
@@ -673,81 +563,5 @@ contract HODL is
             return newCycleBlock;
         }
         return 0;
-    }
-
-    // Computes rewards with precision-based calculations to prevent overflow
-    function calculateReward(
-        uint256 coefficient,
-        uint256 factor,
-        uint256 exponent,
-        uint256 precision
-    ) private pure returns (uint256) {
-        precision = exponent < precision ? exponent : precision;
-        if (exponent > 100) {
-            precision = 30;
-        }
-        if (exponent > 200) exponent = 200;
-
-        uint256 reward = coefficient;
-        uint256 calcExponent = (exponent * (exponent - 1)) / 2;
-        uint256 calcFactorOne = 1;
-        uint256 calcFactorTwo = 1;
-        uint256 calcFactorThree = 1;
-        uint256 i;
-
-        for (i = 2; i <= precision; i += 2) {
-            if (i > 20) {
-                calcFactorOne = factor ** 10;
-                calcFactorTwo = calcFactorOne;
-                calcFactorThree = factor ** (i - 20);
-            } else if (i > 10) {
-                calcFactorOne = factor ** 10;
-                calcFactorTwo = factor ** (i - 10);
-                calcFactorThree = 1;
-            } else {
-                calcFactorOne = factor ** i;
-                calcFactorTwo = 1;
-                calcFactorThree = 1;
-            }
-            reward +=
-                (coefficient * calcExponent) /
-                calcFactorOne /
-                calcFactorTwo /
-                calcFactorThree;
-            calcExponent = i == exponent
-                ? 0
-                : (calcExponent * (exponent - i) * (exponent - i - 1)) /
-                    (i + 1) /
-                    (i + 2);
-        }
-
-        calcExponent = exponent;
-
-        for (i = 1; i <= precision; i += 2) {
-            if (i > 20) {
-                calcFactorOne = factor ** 10;
-                calcFactorTwo = calcFactorOne;
-                calcFactorThree = factor ** (i - 20);
-            } else if (i > 10) {
-                calcFactorOne = factor ** 10;
-                calcFactorTwo = factor ** (i - 10);
-                calcFactorThree = 1;
-            } else {
-                calcFactorOne = factor ** i;
-                calcFactorTwo = 1;
-                calcFactorThree = 1;
-            }
-            reward -=
-                (coefficient * calcExponent) /
-                calcFactorOne /
-                calcFactorTwo /
-                calcFactorThree;
-            calcExponent = i == exponent
-                ? 0
-                : (calcExponent * (exponent - i) * (exponent - i - 1)) /
-                    (i + 1) /
-                    (i + 2);
-        }
-        return reward;
     }
 }
