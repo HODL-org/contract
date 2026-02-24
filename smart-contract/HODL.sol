@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.14:
+// HODL Token Implementation Contract v1.15:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -81,7 +81,7 @@ contract HODL is
     // Reward timing and limitations
     uint256 public rewardClaimPeriod; // Minimum period between reward claims (in seconds)
     uint256 public reinvestBonusCycle; // Claim period reduction for reinvesting 100% of rewards (in seconds)
-    uint256 public updateClaimDateRate; // Threshold for updating user's reward claim timestamp based on balance increase %
+    uint256 public bnbClaimLimitRate; // Max Percentage being claimed from the reward pool
     uint256 public bnbRewardPoolCap; // Max BNB in reward pool used in reward calculations
 
     // Reserves
@@ -100,7 +100,8 @@ contract HODL is
     address private constant RESERVE_ADDRESS =
         0x0000000000000000000000000000000000000000;
 
-    mapping(address => bool) public isRewardToken; // Tokens availabe as reward
+    // Reinvest partner tokens
+    mapping(address => bool) public isRewardToken; // Tokens available as reward
     mapping(address => mapping(address => uint256))
         public partnerTokenUserReinvested;
     mapping(address => uint256) public partnerTokenTotalReinvested;
@@ -133,11 +134,6 @@ contract HODL is
     // Accepts BNB sent directly to the contract
     receive() external payable {}
 
-    function upgrade() external onlyOwner reinitializer(5) {
-        isRewardToken[address(this)] = true;
-        isRewardToken[0xcF640FDF9b3d9E45cbd69fDA91D7e22579c14444] = true; // gorilla
-    }
-
     // Claims rewards in BNB and or tokens based on user's choice, accounting for reward pool cap
     function redeemRewards(uint8 perc, address token) external nonReentrant {
         if (perc > 100) revert ValueOutOfRange();
@@ -148,10 +144,12 @@ contract HODL is
             revert ClaimPeriodNotReached();
         if (userBalance == 0) revert NoHODLInWallet();
 
-        uint256 currentBNBPool = address(this).balance;
-        uint256 reward = currentBNBPool > bnbRewardPoolCap
-            ? (bnbRewardPoolCap * userBalance) / rewardPoolShare
-            : (currentBNBPool * userBalance) / rewardPoolShare;
+        uint256 contractBNBPool = address(this).balance;
+        uint256 currentBNBPool = contractBNBPool > bnbRewardPoolCap
+            ? bnbRewardPoolCap
+            : contractBNBPool;
+
+        uint256 maxReward = (bnbClaimLimitRate * bnbRewardPoolCap) / 100;
 
         uint256 rewardReinvest = 0;
         uint256 rewardBNB = 0;
@@ -159,13 +157,35 @@ contract HODL is
 
         unchecked {
             if (perc == 100) {
-                rewardBNB = reward;
+                rewardBNB = (currentBNBPool * userBalance) / rewardPoolShare;
+                if (rewardBNB > maxReward) {
+                    rewardBNB = maxReward;
+                }
             } else if (perc == 0) {
-                rewardReinvest = reward;
-                nextClaim -= reinvestBonusCycle;
+                rewardReinvest =
+                    (currentBNBPool * userBalance) /
+                    rewardPoolShare;
+                if (rewardReinvest > maxReward) {
+                    rewardReinvest = maxReward;
+                }
+                if (token == address(this)) {
+                    nextClaim -= reinvestBonusCycle;
+                }
             } else {
-                rewardBNB = (reward * perc) / 100;
-                rewardReinvest = reward - rewardBNB;
+                rewardBNB =
+                    (currentBNBPool * userBalance * perc) /
+                    (rewardPoolShare * 100);
+                rewardReinvest =
+                    (currentBNBPool * userBalance * (100 - perc)) /
+                    (rewardPoolShare * 100);
+                if (rewardBNB + rewardReinvest > maxReward) {
+                    rewardBNB =
+                        (bnbClaimLimitRate * bnbRewardPoolCap * perc) /
+                        100;
+                    rewardReinvest =
+                        (bnbClaimLimitRate * bnbRewardPoolCap * (100 - perc)) /
+                        100;
+                }
             }
         }
 
@@ -176,26 +196,32 @@ contract HODL is
             path[0] = PANCAKE_ROUTER.WETH();
             path[1] = token;
 
-            PANCAKE_ROUTER.swapExactETHForTokens{value: rewardReinvest}(
-                0,
-                path,
-                REINVEST_ADDRESS,
-                block.timestamp + 360
-            );
-
             if (token == address(this)) {
+                PANCAKE_ROUTER.swapExactETHForTokens{value: rewardReinvest}(
+                    0,
+                    path,
+                    REINVEST_ADDRESS,
+                    block.timestamp + 360
+                );
                 uint256 transferredAmount = super.balanceOf(REINVEST_ADDRESS);
                 userReinvested[msg.sender] += transferredAmount;
                 totalHODLFromReinvests += transferredAmount;
                 super._update(REINVEST_ADDRESS, msg.sender, transferredAmount);
             } else {
-                uint256 transferredAmount = IERC20(token).balanceOf(
-                    REINVEST_ADDRESS
+                uint256[] memory expectedtoken = PANCAKE_ROUTER.getAmountsOut(
+                    rewardReinvest,
+                    path
                 );
-                partnerTokenUserReinvested[msg.sender][
-                    token
-                ] += transferredAmount;
-                partnerTokenTotalReinvested[token] += transferredAmount;
+                PANCAKE_ROUTER.swapExactETHForTokens{value: rewardReinvest}(
+                    0,
+                    path,
+                    msg.sender,
+                    block.timestamp + 360
+                );
+                partnerTokenUserReinvested[msg.sender][token] += expectedtoken[
+                    1
+                ];
+                partnerTokenTotalReinvested[token] += expectedtoken[1];
             }
         }
 
@@ -215,6 +241,15 @@ contract HODL is
     ) external onlyOwner onlyPermitted {
         isTaxFree[wallet] = taxFree;
         emit ChangeAddressState(wallet, taxFree, "isTaxFree");
+    }
+
+    // Excludes or includes an address as partner reward token
+    function updateIsRewardToken(
+        address token,
+        bool enable
+    ) external onlyOwner onlyPermitted {
+        isRewardToken[token] = enable;
+        emit ChangeAddressState(token, enable, "isRewardToken");
     }
 
     // Excludes or includes an address from circulating supply
@@ -285,12 +320,12 @@ contract HODL is
     }
 
     // Updates threshold for claim timestamp update based on user balance increase (%)
-    function changeUpdateClaimDateRate(
+    function changeBnbClaimLimitRate(
         uint256 newValue
     ) external onlyOwner onlyPermitted {
-        uint256 oldValue = updateClaimDateRate;
-        updateClaimDateRate = newValue;
-        emit ChangeValue(oldValue, newValue, "updateClaimDateRate");
+        uint256 oldValue = bnbClaimLimitRate;
+        bnbClaimLimitRate = newValue;
+        emit ChangeValue(oldValue, newValue, "updateBnbClaimLimitRate");
     }
 
     // Sets claim period deduction for users who reinvest 100% of their rewards (in seconds)
@@ -346,12 +381,16 @@ contract HODL is
     function getCurrentBNBReward(
         address wallet
     ) external view returns (uint256) {
-        uint256 currentBalance = super.balanceOf(address(wallet));
-        uint256 currentBNBPool = address(this).balance;
-        uint256 bnbPool = currentBNBPool > bnbRewardPoolCap
+        uint256 userBalance = super.balanceOf(address(wallet));
+        uint256 contractBNBPool = address(this).balance;
+        uint256 currentBNBPool = contractBNBPool > bnbRewardPoolCap
             ? bnbRewardPoolCap
-            : currentBNBPool;
-        return (bnbPool * currentBalance) / rewardPoolShare;
+            : contractBNBPool;
+
+        uint256 reward = (currentBNBPool * userBalance) / rewardPoolShare;
+        uint256 maxReward = (bnbClaimLimitRate * currentBNBPool) / 100;
+
+        return reward > maxReward ? maxReward : reward;
     }
 
     // Returns updated reward pool share figure
@@ -549,16 +588,12 @@ contract HODL is
         uint256 currentRecipientBalance, // The current balance of the recipient
         uint256 value // The value of the tokens being transferred
     ) private view returns (uint256) {
-        uint256 rate = (value * 100) / currentRecipientBalance; // Calculate percentage increase in holdings
-
         // Update next eligible reward claim timestamp if rate exceeds threshold
-        if (rate >= updateClaimDateRate) {
-            uint256 newCycleBlock = (rewardClaimPeriod * rate) / 100;
-            newCycleBlock = newCycleBlock >= rewardClaimPeriod
-                ? rewardClaimPeriod
-                : newCycleBlock;
-            return newCycleBlock;
-        }
-        return 0;
+        uint256 newCycleBlock = (rewardClaimPeriod * value) /
+            currentRecipientBalance;
+        newCycleBlock = newCycleBlock >= rewardClaimPeriod
+            ? rewardClaimPeriod
+            : newCycleBlock;
+        return newCycleBlock;
     }
 }
