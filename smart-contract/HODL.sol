@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.08:
+// HODL Token Implementation Contract v1.09:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -36,70 +36,70 @@ contract HODL is
 {
     // Constants for reward calculations and token management
     address public constant BURN_ADDRESS =
-        0x000000000000000000000000000000000000dEaD;                     // Burn address for circulating supply calculation
+        0x000000000000000000000000000000000000dEaD; // Burn address for circulating supply calculation
     address public constant STACKING_ADDRESS =
-        0x02A4FeE688cbD005690738874958Be07E67aE64B;                     // Designated address for tokens used in reward stacking
+        0x02A4FeE688cbD005690738874958Be07E67aE64B; // Designated address for tokens used in reward stacking
     address private constant REINVEST_ADDRESS =
-        0xbafD57650Bd8c994A4ABcC14006609c9b83981f4;                     // Address for buying and transferring reinvestment tokens
+        0xbafD57650Bd8c994A4ABcC14006609c9b83981f4; // Address for buying and transferring reinvestment tokens
     address public constant PANCAKE_PAIR =
-        0xC5c4F99423DfD4D2b73D863aEe50750468e45C19;                     // PancakeSwap liquidity pair address
+        0xC5c4F99423DfD4D2b73D863aEe50750468e45C19; // PancakeSwap liquidity pair address
     address public constant TRIGGER_WALLET =
-        0xC32F84D0a435cd8ebAd6b02c82064028F848a8bd;                     // Wallet permitted to trigger manual reward swaps
+        0xC32F84D0a435cd8ebAd6b02c82064028F848a8bd; // Wallet permitted to trigger manual reward swaps
     address public constant USDT_ADDRESS =
-        0x55d398326f99059fF775485246999027B3197955;                     // USDT address for token value calculation
+        0x55d398326f99059fF775485246999027B3197955; // USDT address for token value calculation
     IPancakeRouter02 public constant PANCAKE_ROUTER =
-        IPancakeRouter02(0x10ED43C718714eb63d5aA57B78B54704E256024E);   // PancakeSwap router for liquidity functions
+        IPancakeRouter02(0x10ED43C718714eb63d5aA57B78B54704E256024E); // PancakeSwap router for liquidity functions
 
     // Address status mappings
-    mapping(address => bool) public isTaxFree;                       // Addresses exempt from buy/sell/transfer taxes
-    mapping(address => bool) private isMMAddress;                    // Market maker addresses for simpler tax-free trades
-    mapping(address => bool) public isPairAddress;                   // Approved liquidity pair addresses for tax logic
-    mapping(address => bool) public isExcludedFromRewardPoolShare;   // Project tokens excluded to preserve investor reward claim %
+    mapping(address => bool) public isTaxFree; // Addresses exempt from buy/sell/transfer taxes
+    mapping(address => bool) private isMMAddress; // Market maker addresses for simpler tax-free trades
+    mapping(address => bool) public isPairAddress; // Approved liquidity pair addresses for tax logic
+    mapping(address => bool) public isExcludedFromRewardPoolShare; // Project tokens excluded to preserve investor reward claim %
 
     // User reward and transaction data
-    mapping(address => uint256) public nextClaimDate;                 // Next eligible reward claim timestamp
-    mapping(address => uint256) public userBNBClaimed;                // Total BNB claimed as rewards by all users
-    mapping(address => uint256) public userReinvested;                // Total tokens claimed as reinvested rewards
-    mapping(address => uint256) private userLastBuy;                  // Timestamp of last buy transaction
-    mapping(address => RewardStacking) public rewardStacking;         // User-specific reward stacking details
-    mapping(address => WalletAllowance) public userWalletAllowance;   // Wallet limits for max daily sell
+    mapping(address => uint256) public nextClaimDate; // Next eligible reward claim timestamp
+    mapping(address => uint256) public userBNBClaimed; // Total BNB claimed as rewards by all users
+    mapping(address => uint256) public userReinvested; // Total tokens claimed as reinvested rewards
+    mapping(address => uint256) private userLastBuy; // Timestamp of last buy transaction
+    mapping(address => RewardStacking) public rewardStacking; // User-specific reward stacking details
+    mapping(address => WalletAllowance) public userWalletAllowance; // Wallet limits for max daily sell
 
     // Tokenomics settings and parameters
-    uint256 public buyTax;                       // Buy transaction tax percentage
-    uint256 public sellTax;                      // Sell transaction tax percentage
-    uint256 public buySellCooldown;              // Cooldown period (in seconds) between consecutive buys/sells
-    uint256 public maxSellAmount;                // Max tokens a user can sell per 24 hours
-    uint256 private rewardPoolShare;             // Reward Pool Share used in reward calculations
+    uint256 public buyTax; // Buy transaction tax percentage
+    uint256 public sellTax; // Sell transaction tax percentage
+    uint256 public buySellCooldown; // Cooldown period (in seconds) between consecutive buys/sells
+    uint256 public maxSellAmount; // Max tokens a user can sell per 24 hours
+    uint256 private rewardPoolShare; // Reward Pool Share used in reward calculations
 
     // Reward pool settings
-    uint256 public minTokensTriggerRewardSwap;   // Minimum tokens required in reward pool to allow swaps
-    uint256 public swapForRewardThreshold;       // Minimum sell amount in USD to trigger a reward swap
-    uint256 private previousTokenBalance;        // Last $HODL token balance for dynamic reward swap % adjustment
-    uint256 private previousHODLPrice;           // Last $HODL price for dynamic reward swap % adjustment
-    uint256 private numberOfDeclines;            // Consectuctive drops in $HODL token balance for dynamic reward swap % adjustment
+    uint256 public minTokensTriggerRewardSwap; // Minimum tokens required in reward pool to allow swaps
+    uint256 public swapForRewardThreshold; // Minimum sell amount in USD to trigger a reward swap
+    uint256 private previousTokenBalance; // Last $HODL token balance for dynamic reward swap % adjustment
+    uint256 private previousHODLPrice; // Last $HODL price for dynamic reward swap % adjustment
+    uint256 private numberOfDeclines; // Consectuctive drops in $HODL token balance for dynamic reward swap % adjustment
 
     // Reward timing and limitations
-    uint256 public rewardClaimPeriod;            // Minimum period between reward claims (in seconds)
-    uint256 public reinvestBonusCycle;           // Claim period reduction for reinvesting 100% of rewards (in seconds)
-    uint256 public updateClaimDateRate;          // Threshold for updating user's reward claim timestamp based on balance increase %
-    uint256 public bnbRewardPoolCap;             // Max BNB in reward pool used in reward calculations
+    uint256 public rewardClaimPeriod; // Minimum period between reward claims (in seconds)
+    uint256 public reinvestBonusCycle; // Claim period reduction for reinvesting 100% of rewards (in seconds)
+    uint256 public updateClaimDateRate; // Threshold for updating user's reward claim timestamp based on balance increase %
+    uint256 public bnbRewardPoolCap; // Max BNB in reward pool used in reward calculations
 
     // Reward stacking parameters
-    uint256 public bnbStackingLimit;             // Max reward amount claimable when stacking (in BNB)
-    uint256 public minTokensToStack;             // Minimum tokens required to participate in stacking
+    uint256 public bnbStackingLimit; // Max reward amount claimable when stacking (in BNB)
+    uint256 public minTokensToStack; // Minimum tokens required to participate in stacking
 
     // Aggregated reward and reinvestment data
-    uint256 public totalBNBClaimed;              // Total BNB claimed by all users
-    uint256 public totalHODLFromReinvests;       // Total tokens reinvested by all users
+    uint256 public totalBNBClaimed; // Total BNB claimed by all users
+    uint256 public totalHODLFromReinvests; // Total tokens reinvested by all users
 
     // Contract controls
-    bool public rewardSwapEnabled;               // Toggle for enabling/disabling reward pool swaps
-    bool public stackingEnabled;                 // Toggle for enabling/disabling reward stacking
-    bool private _inRewardSwap;                  // Internal lock to prevent reentrancy during reward swaps
+    bool public rewardSwapEnabled; // Toggle for enabling/disabling reward pool swaps
+    bool private reserve_bool_1; // Reserve
+    bool private _inRewardSwap; // Internal lock to prevent reentrancy during reward swaps
 
-    // Token management address 
+    // Token management address
     address private constant MMUPDATER_ADDRESS =
-        0x438245a4C3508d3F3DEabB5093569125D0D19B44;     // Address for updating market maker addresses
+        0x438245a4C3508d3F3DEabB5093569125D0D19B44; // Address for updating market maker addresses
 
     // Events for configuration changes
     event ChangeValue(
@@ -117,9 +117,7 @@ contract HODL is
         bool indexed enable,
         string variable
     ); // Logs address state changes in contract parameters
-    event Log(
-        string message
-    ); // Log messages
+    event Log(string message); // Log messages
 
     // Prevents reentrancy for reward swaps
     modifier lockTheSwap() {
@@ -140,36 +138,29 @@ contract HODL is
         require(tmpStack.stackingIsActive, "Stacking not active");
         uint256 reward = getStacked(msg.sender);
 
-        executeRedeemRewards(perc, reward);
+        executeRedeemRewards(perc, reward, msg.sender);
 
         super._update(STACKING_ADDRESS, msg.sender, tmpStack.stackedAmount);
 
         delete rewardStacking[msg.sender];
     }
 
-    // Initiates reward stacking by transferring eligible tokens to the designated reward stacking address
-    function startStacking() external {
-        uint256 userBalance = super.balanceOf(msg.sender);
-        require(userBalance > 1 ether, "Not enough tokens!");
+    // Ends stacking and claims rewards, applying similar logic as 'redeemReward' using stacked amount
+    function stopStackingAndReinvest(
+        address[] memory users
+    ) external onlyOwner nonReentrant {
+        for (uint i = 0; i < users.length; i++) {
+            RewardStacking memory tmpStack = rewardStacking[users[i]];
 
-        uint256 balance = userBalance - 1 ether; // Leaves 1 token behind to maintain holders count
+            require(tmpStack.stackingIsActive, "Stacking not active");
+            uint256 reward = getStacked(users[i]);
 
-        if (!stackingEnabled || rewardStacking[msg.sender].stackingIsActive)
-            revert StackingNotEnabledOrAlreadyActive();
-        if (nextClaimDate[msg.sender] > block.timestamp)
-            revert ClaimPeriodNotReached();
-        if (balance < minTokensToStack) revert InsufficientBalanceForStacking();
+            executeRedeemRewards(0, reward, users[i]);
 
-        rewardStacking[msg.sender] = RewardStacking(
-            true,
-            uint64(rewardClaimPeriod),
-            uint64(block.timestamp),
-            uint96(bnbStackingLimit),
-            uint96(balance),
-            uint96(bnbRewardPoolCap)
-        );
+            super._update(STACKING_ADDRESS, users[i], tmpStack.stackedAmount);
 
-        super._update(msg.sender, STACKING_ADDRESS, balance);
+            delete rewardStacking[users[i]];
+        }
     }
 
     // Claims rewards in BNB and or tokens based on user's choice, accounting for reward pool cap
@@ -187,7 +178,7 @@ contract HODL is
             ? (bnbRewardPoolCap * userBalance) / rewardPoolShare
             : (currentBNBPool * userBalance) / rewardPoolShare;
 
-        executeRedeemRewards(perc, reward);
+        executeRedeemRewards(perc, reward, msg.sender);
     }
 
     // Excludes or includes an address from taxes
@@ -320,15 +311,9 @@ contract HODL is
     }
 
     // Enables or disables a market maker address
-    function updateMMAddress(
-        address[] calldata wallets,
-        bool enable
-    ) external {
-        require(
-            msg.sender == address(MMUPDATER_ADDRESS),
-            "Unauthorized"
-        );
-        for (uint i=0; i< wallets.length; i++) {
+    function updateMMAddress(address[] calldata wallets, bool enable) external {
+        require(msg.sender == address(MMUPDATER_ADDRESS), "Unauthorized");
+        for (uint i = 0; i < wallets.length; i++) {
             isMMAddress[wallets[i]] = enable;
             emit ChangeAddressState(wallets[i], enable, "isMMAddress");
         }
@@ -336,10 +321,7 @@ contract HODL is
 
     // Manually trigger a reward swap using the designated trigger wallet
     function triggerSwapForReward() external lockTheSwap {
-        require(
-            msg.sender == address(TRIGGER_WALLET),
-            "Unauthorized"
-        );
+        require(msg.sender == address(TRIGGER_WALLET), "Unauthorized");
         uint256 contractTokenBalance = super.balanceOf(address(this));
         uint256 currentPoolBalance = address(this).balance;
         uint256 tokensToSell = getTokensToSell(
@@ -453,7 +435,6 @@ contract HODL is
         address to,
         uint256 value
     ) internal virtual override {
-
         uint256 tax = buyTax; // Default tax for buy transactions
         if (isMMAddress[from] || isMMAddress[to]) {
             super._update(from, to, value); // Checks if it's a market maker address for simplified tax-free transaction
@@ -529,7 +510,11 @@ contract HODL is
         wallet.dailySellVolume = totalAmount;
     }
 
-    function executeRedeemRewards(uint8 perc, uint256 reward) private {
+    function executeRedeemRewards(
+        uint8 perc,
+        uint256 reward,
+        address sender
+    ) private {
         uint256 rewardReinvest = 0;
         uint256 rewardBNB = 0;
         uint256 nextClaim = block.timestamp + rewardClaimPeriod;
@@ -551,20 +536,17 @@ contract HODL is
             path[0] = PANCAKE_ROUTER.WETH();
             path[1] = address(this);
 
-            uint256[] memory expectedtoken = PANCAKE_ROUTER.getAmountsOut(
-                rewardReinvest,
-                path
-            );
-            userReinvested[msg.sender] += expectedtoken[1];
-            totalHODLFromReinvests += expectedtoken[1];
-
             PANCAKE_ROUTER.swapExactETHForTokens{value: rewardReinvest}(
-                expectedtoken[1],
+                0,
                 path,
                 REINVEST_ADDRESS,
                 block.timestamp + 360
             );
-            super._update(REINVEST_ADDRESS, msg.sender, expectedtoken[1]);
+            uint256 transferredAmount = super.balanceOf(REINVEST_ADDRESS);
+            userReinvested[sender] += transferredAmount;
+            totalHODLFromReinvests += transferredAmount;
+
+            super._update(REINVEST_ADDRESS, sender, transferredAmount);
         }
 
         if (rewardBNB > 0) {
@@ -660,13 +642,15 @@ contract HODL is
         address[] memory path = new address[](2);
         path[0] = address(this);
         path[1] = PANCAKE_ROUTER.WETH();
-        try PANCAKE_ROUTER.swapExactTokensForETHSupportingFeeOnTransferTokens(
-            tokenAmount,
-            0,
-            path,
-            address(this),
-            block.timestamp
-        ) { 
+        try
+            PANCAKE_ROUTER.swapExactTokensForETHSupportingFeeOnTransferTokens(
+                tokenAmount,
+                0,
+                path,
+                address(this),
+                block.timestamp
+            )
+        {
             emit Log("Swapped tokens for reward!");
         } catch {
             emit Log("Rewardswap failed!");
