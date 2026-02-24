@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.15:
+// HODL Token Implementation Contract v1.16:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -43,8 +43,6 @@ contract HODL is
         0xbafD57650Bd8c994A4ABcC14006609c9b83981f4; // Address for buying and transferring reinvestment tokens
     address public constant PANCAKE_PAIR =
         0xC5c4F99423DfD4D2b73D863aEe50750468e45C19; // PancakeSwap liquidity pair address
-    address public constant TRIGGER_WALLET =
-        0xC32F84D0a435cd8ebAd6b02c82064028F848a8bd; // Wallet permitted to trigger manual reward swaps
     address public constant USDT_ADDRESS =
         0x55d398326f99059fF775485246999027B3197955; // USDT address for token value calculation
     IPancakeRouter02 public constant PANCAKE_ROUTER =
@@ -97,14 +95,13 @@ contract HODL is
     bool private reserve_bool; // Reserve
     bool private _inRewardSwap; // Internal lock to prevent reentrancy during reward swaps
 
-    address private constant RESERVE_ADDRESS =
-        0x0000000000000000000000000000000000000000;
-
     // Reinvest partner tokens
     mapping(address => bool) public isRewardToken; // Tokens available as reward
     mapping(address => mapping(address => uint256))
         public partnerTokenUserReinvested;
     mapping(address => uint256) public partnerTokenTotalReinvested;
+
+    address public triggerWallet; // Wallet permitted to trigger manual reward swaps
 
     // Events for configuration changes
     event ChangeValue(
@@ -133,6 +130,15 @@ contract HODL is
 
     // Accepts BNB sent directly to the contract
     receive() external payable {}
+
+    function upgrade() external onlyOwner reinitializer(16) {
+        triggerWallet = 0x9c8099f694195e3Ba1d997a51f5A82A11396c96c;
+        emit ChangeAddress(
+            0xC32F84D0a435cd8ebAd6b02c82064028F848a8bd,
+            triggerWallet,
+            "triggerWallet"
+        );
+    }
 
     // Claims rewards in BNB and or tokens based on user's choice, accounting for reward pool cap
     function redeemRewards(uint8 perc, address token) external nonReentrant {
@@ -347,6 +353,15 @@ contract HODL is
         emit ChangeValue(oldValue, newValue, "buySellCooldown");
     }
 
+    // Sets new trigger wallet
+    function changeTriggerWallet(
+        address newWallet
+    ) external onlyOwner onlyPermitted {
+        address oldAddress = triggerWallet;
+        triggerWallet = newWallet;
+        emit ChangeAddress(oldAddress, newWallet, "triggerWallet");
+    }
+
     // Enables or disables a liquidity pool pairing address
     function updatePairAddress(
         address wallet,
@@ -367,7 +382,7 @@ contract HODL is
 
     // Manually trigger a reward swap using the designated trigger wallet
     function triggerSwapForReward() external lockTheSwap {
-        require(msg.sender == address(TRIGGER_WALLET), "Unauthorized");
+        require(msg.sender == address(triggerWallet), "Unauthorized");
         uint256 contractTokenBalance = super.balanceOf(address(this));
         uint256 currentPoolBalance = address(this).balance;
         uint256 tokensToSell = getTokensToSell(
