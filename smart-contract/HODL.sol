@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.13:
+// HODL Token Implementation Contract v1.14:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -84,7 +84,7 @@ contract HODL is
     uint256 public updateClaimDateRate; // Threshold for updating user's reward claim timestamp based on balance increase %
     uint256 public bnbRewardPoolCap; // Max BNB in reward pool used in reward calculations
 
-    // Rsserves
+    // Reserves
     uint256 private reserve_int_1; // Reserve
     uint256 private reserve_int_2; // Reserve
 
@@ -99,6 +99,11 @@ contract HODL is
 
     address private constant RESERVE_ADDRESS =
         0x0000000000000000000000000000000000000000;
+
+    mapping(address => bool) public isRewardToken; // Tokens availabe as reward
+    mapping(address => mapping(address => uint256))
+        public partnerTokenUserReinvested;
+    mapping(address => uint256) public partnerTokenTotalReinvested;
 
     // Events for configuration changes
     event ChangeValue(
@@ -128,8 +133,13 @@ contract HODL is
     // Accepts BNB sent directly to the contract
     receive() external payable {}
 
+    function upgrade() external onlyOwner reinitializer(5) {
+        isRewardToken[address(this)] = true;
+        isRewardToken[0xcF640FDF9b3d9E45cbd69fDA91D7e22579c14444] = true; // gorilla
+    }
+
     // Claims rewards in BNB and or tokens based on user's choice, accounting for reward pool cap
-    function redeemRewards(uint8 perc) external nonReentrant {
+    function redeemRewards(uint8 perc, address token) external nonReentrant {
         if (perc > 100) revert ValueOutOfRange();
 
         uint256 userBalance = super.balanceOf(msg.sender);
@@ -160,9 +170,11 @@ contract HODL is
         }
 
         if (perc < 100) {
+            if (!isRewardToken[token]) revert TokenIsNoRewardToken();
+
             address[] memory path = new address[](2);
             path[0] = PANCAKE_ROUTER.WETH();
-            path[1] = address(this);
+            path[1] = token;
 
             PANCAKE_ROUTER.swapExactETHForTokens{value: rewardReinvest}(
                 0,
@@ -170,11 +182,21 @@ contract HODL is
                 REINVEST_ADDRESS,
                 block.timestamp + 360
             );
-            uint256 transferredAmount = super.balanceOf(REINVEST_ADDRESS);
-            userReinvested[msg.sender] += transferredAmount;
-            totalHODLFromReinvests += transferredAmount;
 
-            super._update(REINVEST_ADDRESS, msg.sender, transferredAmount);
+            if (token == address(this)) {
+                uint256 transferredAmount = super.balanceOf(REINVEST_ADDRESS);
+                userReinvested[msg.sender] += transferredAmount;
+                totalHODLFromReinvests += transferredAmount;
+                super._update(REINVEST_ADDRESS, msg.sender, transferredAmount);
+            } else {
+                uint256 transferredAmount = IERC20(token).balanceOf(
+                    REINVEST_ADDRESS
+                );
+                partnerTokenUserReinvested[msg.sender][
+                    token
+                ] += transferredAmount;
+                partnerTokenTotalReinvested[token] += transferredAmount;
+            }
         }
 
         if (rewardBNB > 0) {
