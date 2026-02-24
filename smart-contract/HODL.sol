@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.10:
+// HODL Token Implementation Contract v1.11:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -127,11 +127,6 @@ contract HODL is
 
     // Accepts BNB sent directly to the contract
     receive() external payable {}
-
-    function upgrade() external onlyOwner reinitializer(4) {
-        bnbRewardPoolCap = 20000000000000000000;
-        reinvestBonusCycle = 172800;
-    }
 
     // Claims rewards in BNB and or tokens based on user's choice, accounting for reward pool cap
     function redeemRewards(uint8 perc) external nonReentrant {
@@ -373,12 +368,11 @@ contract HODL is
         address to,
         uint256 value
     ) internal virtual override {
-        uint256 tax = buyTax; // Default tax for buy transactions
         if (isMMAddress[from] || isMMAddress[to]) {
             super._update(from, to, value); // Checks if it's a market maker address for simplified tax-free transaction
             updateRewardPoolShare(value, from, to); // Update reward pool share figure
         } else {
-            bool takeFee = !(isTaxFree[from] || isTaxFree[to]); // Applies fee, unless address is tax exempt
+            uint256 tax = sellTax; // Default tax for sell transactions
 
             // Handle sell transactions
             if (isPairAddress[to] && from != address(this) && !_isOwner(from)) {
@@ -394,17 +388,17 @@ contract HODL is
                 ) {
                     swapForReward(from, to);
                 }
-                tax = sellTax;
             }
             // Handle buy transactions
             else if (
                 isPairAddress[from] && to != address(this) && !_isOwner(from)
             ) {
                 userLastBuy[to] = block.timestamp; // Track last buy timestamp for cooldown enforcement
+                tax = buyTax;
             }
 
             // Apply tax if applicable and update balances
-            if (takeFee) {
+            if (!(isTaxFree[from] || isTaxFree[to] || tax == 0)) {
                 uint256 fees = (value * tax) / 100;
                 value -= fees;
                 super._update(from, address(this), fees);
