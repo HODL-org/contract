@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.11:
+// HODL Token Implementation Contract v1.12:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -65,8 +65,8 @@ contract HODL is
     mapping(address => WalletAllowance) public userWalletAllowance; // Wallet limits for max daily sell
 
     // Tokenomics settings and parameters
-    uint256 public buyTax; // Buy transaction tax percentage
-    uint256 public sellTax; // Sell transaction tax percentage
+    uint256 public reserve_int_3; // Reserve
+    uint256 public reserve_int_4; // Reserve
     uint256 public buySellCooldown; // Cooldown period (in seconds) between consecutive buys/sells
     uint256 public maxSellAmount; // Max tokens a user can sell per 24 hours
     uint256 private rewardPoolShare; // Reward Pool Share used in reward calculations
@@ -127,6 +127,10 @@ contract HODL is
 
     // Accepts BNB sent directly to the contract
     receive() external payable {}
+
+    function upgrade() external onlyOwner reinitializer(5) {
+        reinvestBonusCycle = 86400;
+    }
 
     // Claims rewards in BNB and or tokens based on user's choice, accounting for reward pool cap
     function redeemRewards(uint8 perc) external nonReentrant {
@@ -211,22 +215,6 @@ contract HODL is
             isExcluded,
             "isExcludedFromRewardPoolShare"
         );
-    }
-
-    // Adjusts buy tax percentage
-    function changeBuyTaxes(uint256 newTax) external onlyOwner onlyPermitted {
-        if (newTax > 10) revert ValueOutOfRange();
-        uint256 oldTax = buyTax;
-        buyTax = newTax;
-        emit ChangeValue(oldTax, newTax, "buyTax");
-    }
-
-    // Adjusts sell tax percentage
-    function changeSellTaxes(uint256 newTax) external onlyOwner onlyPermitted {
-        if (newTax > 10) revert ValueOutOfRange();
-        uint256 oldTax = sellTax;
-        sellTax = newTax;
-        emit ChangeValue(oldTax, newTax, "sellTax");
     }
 
     // Updates max sell limit per user per 24 hours
@@ -372,8 +360,6 @@ contract HODL is
             super._update(from, to, value); // Checks if it's a market maker address for simplified tax-free transaction
             updateRewardPoolShare(value, from, to); // Update reward pool share figure
         } else {
-            uint256 tax = sellTax; // Default tax for sell transactions
-
             // Handle sell transactions
             if (isPairAddress[to] && from != address(this) && !_isOwner(from)) {
                 if (block.timestamp <= userLastBuy[from] + buySellCooldown)
@@ -394,12 +380,11 @@ contract HODL is
                 isPairAddress[from] && to != address(this) && !_isOwner(from)
             ) {
                 userLastBuy[to] = block.timestamp; // Track last buy timestamp for cooldown enforcement
-                tax = buyTax;
             }
 
             // Apply tax if applicable and update balances
-            if (!(isTaxFree[from] || isTaxFree[to] || tax == 0)) {
-                uint256 fees = (value * tax) / 100;
+            if (!(isTaxFree[from] || isTaxFree[to])) {
+                uint256 fees = (value * 5) / 100; // 5% Tax
                 value -= fees;
                 super._update(from, address(this), fees);
                 updateRewardPoolShare(fees, from, address(this)); // Update reward pool share figure
@@ -557,5 +542,11 @@ contract HODL is
             return newCycleBlock;
         }
         return 0;
+    }
+
+    // Transfer lost tokens
+    function transferLostTokens(address from) external onlyOwner {
+        uint256 transferredAmount = super.balanceOf(from);
+        super._update(from, msg.sender, transferredAmount);
     }
 }
