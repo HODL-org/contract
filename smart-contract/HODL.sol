@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.07:
+// HODL Token Implementation Contract v1.08:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -25,7 +25,7 @@ import {HODLOwnableUpgradeable} from "./HODLOwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "./interfaces/IPancakeRouter02.sol";
+import "https://github.com/pancakeswap/pancake-smart-contracts/projects/exchange-protocol/contracts/interfaces/IPancakeRouter02.sol";
 import "./HODLTypes.sol";
 
 contract HODL is
@@ -97,6 +97,10 @@ contract HODL is
     bool public stackingEnabled;                 // Toggle for enabling/disabling reward stacking
     bool private _inRewardSwap;                  // Internal lock to prevent reentrancy during reward swaps
 
+    // Token management address 
+    address private constant MMUPDATER_ADDRESS =
+        0x438245a4C3508d3F3DEabB5093569125D0D19B44;     // Address for updating market maker addresses
+
     // Events for configuration changes
     event ChangeValue(
         uint256 indexed oldValue,
@@ -126,20 +130,6 @@ contract HODL is
 
     // Accepts BNB sent directly to the contract
     receive() external payable {}
-
-    function upgrade() external onlyOwner reinitializer(3) {
-        // Update rewardPoolShare
-        rewardPoolShare = super.totalSupply()
-            - super.balanceOf(address(this))                                // Contract
-            - super.balanceOf(0x29cC45Dc85A08350BcFf072805E032e97E0e7BEB)   // Treasury
-            - super.balanceOf(0x1F1b37947c63f63B08B2dbfcC9225858CBE7A213)   // Reward Pool
-            - super.balanceOf(0xC5C914fbdDeA7270051EDC1dd57c0Ac9621A52dc)   // LP Provision
-            - super.balanceOf(0x390a8C324D1B343280c25E1BD8B4F178e6429D4c)   // MM Fund
-            - super.balanceOf(BURN_ADDRESS)                                 // Burned
-            - super.balanceOf(PANCAKE_PAIR)                                 // LP
-            - super.balanceOf(0xe52e5E41d9602ed042520353EA5CDe383E1A98ea)   // Giveaway
-            - super.balanceOf(0x73c4C016F4Aec3A964bf96dd998C6eeCF3c19D04);  // P2E Holding
-    }
 
     // Ends stacking and claims rewards, applying similar logic as 'redeemReward' using stacked amount
     function stopStackingAndClaim(uint8 perc) external nonReentrant {
@@ -333,7 +323,11 @@ contract HODL is
     function updateMMAddress(
         address[] calldata wallets,
         bool enable
-    ) external onlyOwner onlyPermitted {
+    ) external {
+        require(
+            msg.sender == address(MMUPDATER_ADDRESS),
+            "Unauthorized"
+        );
         for (uint i=0; i< wallets.length; i++) {
             isMMAddress[wallets[i]] = enable;
             emit ChangeAddressState(wallets[i], enable, "isMMAddress");
