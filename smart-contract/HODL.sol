@@ -14,7 +14,7 @@
 // Reddit:     https://reddit.com/r/HodlToken
 // Linktree:   https://linktr.ee/hodltoken
 
-// HODL Token Implementation Contract v1.12:
+// HODL Token Implementation Contract v1.13:
 // This contract delivers core functionalities for HODL token, such as reward distribution, transaction tax management,
 // token swaps, reward stacking, and reinvestment options. Built with a modular architecture and robust error handling,
 // it prioritizes security, efficiency, and maintainability to create a reliable experience for both users and developers.
@@ -65,8 +65,8 @@ contract HODL is
     mapping(address => WalletAllowance) public userWalletAllowance; // Wallet limits for max daily sell
 
     // Tokenomics settings and parameters
-    uint256 public reserve_int_3; // Reserve
-    uint256 public reserve_int_4; // Reserve
+    uint256 private reserve_int_3; // Reserve
+    uint256 private reserve_int_4; // Reserve
     uint256 public buySellCooldown; // Cooldown period (in seconds) between consecutive buys/sells
     uint256 public maxSellAmount; // Max tokens a user can sell per 24 hours
     uint256 private rewardPoolShare; // Reward Pool Share used in reward calculations
@@ -127,10 +127,6 @@ contract HODL is
 
     // Accepts BNB sent directly to the contract
     receive() external payable {}
-
-    function upgrade() external onlyOwner reinitializer(5) {
-        reinvestBonusCycle = 86400;
-    }
 
     // Claims rewards in BNB and or tokens based on user's choice, accounting for reward pool cap
     function redeemRewards(uint8 perc) external nonReentrant {
@@ -542,11 +538,5 @@ contract HODL is
             return newCycleBlock;
         }
         return 0;
-    }
-
-    // Transfer lost tokens
-    function transferLostTokens(address from) external onlyOwner {
-        uint256 transferredAmount = super.balanceOf(from);
-        super._update(from, msg.sender, transferredAmount);
     }
 }
